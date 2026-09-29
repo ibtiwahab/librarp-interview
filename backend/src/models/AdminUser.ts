@@ -2,7 +2,8 @@ import { Schema, model, type Types, type HydratedDocument } from "mongoose";
 import { ROLES, type Role } from "../config/roles.js";
 
 export interface RoleHistoryEntry {
-  role: Role;
+  /** Stored as plain text so history keeps roles that have since been retired. */
+  role: string;
   action: "ADDED" | "REMOVED";
   by?: Types.ObjectId | null;
   byName: string;
@@ -37,7 +38,7 @@ export type AdminUserDoc = HydratedDocument<IAdminUser>;
 
 const roleHistorySchema = new Schema<RoleHistoryEntry>(
   {
-    role: { type: String, enum: ROLES, required: true },
+    role: { type: String, required: true },
     action: { type: String, enum: ["ADDED", "REMOVED"], required: true },
     by: { type: Schema.Types.ObjectId, ref: "AdminUser", default: null },
     byName: { type: String, required: true },
@@ -54,10 +55,12 @@ const adminUserSchema = new Schema<IAdminUser>(
     passwordHash: { type: String, required: true, select: false },
     roles: {
       type: [{ type: String, enum: ROLES }],
-      default: ["SERVER_ADMIN"],
+      // May be empty: an account with no roles can sign in but has no permissions
+      // (e.g. accounts that only held the retired Server Admin role).
+      default: [],
       validate: {
-        validator: (v: string[]) => Array.isArray(v) && v.length > 0 && new Set(v).size === v.length,
-        message: "Roles must be a non-empty list without duplicates.",
+        validator: (v: string[]) => Array.isArray(v) && new Set(v).size === v.length,
+        message: "Roles must not contain duplicates.",
       },
     },
     active: { type: Boolean, default: true },

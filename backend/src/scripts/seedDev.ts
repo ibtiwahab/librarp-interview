@@ -46,6 +46,7 @@ async function main() {
   const content: Record<string, SeedQuestion[]> = {
     FIB: fromDocument(SAMPLE_FIB_TEXT),
     EMS: fromDocument(SAMPLE_EMS_TEXT),
+    ADMIN_ASSISTANT: SAMPLE_ADMIN_QUESTIONS,
     SERVER_ADMIN: SAMPLE_ADMIN_QUESTIONS,
   };
 

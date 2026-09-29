@@ -9,7 +9,6 @@ export const ROLE_META: Record<Role, { label: string; short: string; tone: "gold
   STATE_CURATOR: { label: "State Curator", short: "State Curator", tone: "state" },
   CRIME_CURATOR: { label: "Crime Curator", short: "Crime Curator", tone: "crime" },
   SUPPORT_CURATOR: { label: "Support Curator", short: "Support Curator", tone: "support" },
-  SERVER_ADMIN: { label: "Server Admin", short: "Server Admin", tone: "base" },
 };
 
 export const ROLE_ORDER: Role[] = [
@@ -20,8 +19,16 @@ export const ROLE_ORDER: Role[] = [
   "STATE_CURATOR",
   "CRIME_CURATOR",
   "SUPPORT_CURATOR",
-  "SERVER_ADMIN",
 ];
+
+/** Roles that were removed from the system; they can still appear in role history. */
+export const RETIRED_ROLE_LABELS: Record<string, string> = {
+  SERVER_ADMIN: "Server Admin (retired)",
+};
+
+export function roleLabel(role: string): string {
+  return ROLE_META[role as Role]?.label ?? RETIRED_ROLE_LABELS[role] ?? role;
+}
 
 export const INTERVIEW_TYPE_META: Record<InterviewType, { label: string; short: string; description: string; capability: keyof Capabilities }> = {
   STATE: {
@@ -39,7 +46,7 @@ export const INTERVIEW_TYPE_META: Record<InterviewType, { label: string; short: 
   ADMIN: {
     label: "Admin",
     short: "Admin",
-    description: "Candidates applying to join the Libra RP server administration team.",
+    description: "Admin Assistant and Server Admin candidates for the Libra RP administration team.",
     capability: "canInterviewAdmins",
   },
 };
@@ -107,6 +114,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   QUESTION_SET_DUPLICATED: "Duplicated question set",
   INTERVIEW_STARTED: "Started interview",
   INTERVIEW_COMPLETED: "Recorded interview decision",
+  INTERVIEW_UPDATED: "Edited submitted interview",
   INTERVIEW_DELETED: "Deleted interview",
   ORGANIZATION_UPDATED: "Updated organization",
   SETTINGS_UPDATED: "Updated settings",

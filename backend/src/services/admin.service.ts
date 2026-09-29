@@ -2,7 +2,7 @@ import type { Request } from "express";
 import type { z } from "zod";
 import { Types } from "mongoose";
 import { AdminUser, type AdminUserDoc, type IAdminUser, type RoleHistoryEntry } from "../models/AdminUser.js";
-import { BASE_ROLE, ROLE_DEFINITIONS, type Role } from "../config/roles.js";
+import { ROLE_DEFINITIONS, type Role } from "../config/roles.js";
 import { AppError, conflict, forbidden, notFound } from "../utils/errors.js";
 import { escapeRegex, paginated } from "../utils/http.js";
 import { generateTemporaryPassword, hashPassword } from "../utils/crypto.js";
@@ -128,7 +128,7 @@ async function assertUsernameAvailable(username: string | undefined, excludeId?:
 
 export async function createAdmin(req: Request, input: CreateInput) {
   const actor = req.auth!.principal;
-  const roles = sortRoles([...new Set<Role>([BASE_ROLE, ...input.roles])]);
+  const roles = sortRoles([...new Set<Role>(input.roles)]);
   ensure(canCreateAccountWithRoles(actor, roles));
   await assertUsernameAvailable(input.username);
 
@@ -258,7 +258,6 @@ export async function removeRole(req: Request, id: string, role: Role) {
   if (!target.roles.includes(role)) {
     throw conflict(`This administrator does not have the ${roleLabel(role)} role.`);
   }
-  if (target.roles.length === 1) throw new AppError("INVALID_STATE", "An administrator must keep at least one role.");
   ensure(canAssignRole(actor, toPrincipal(target), role));
   await applyRoleChange(
     req,

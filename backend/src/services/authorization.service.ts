@@ -1,4 +1,4 @@
-import { ROLE_DEFINITIONS, BASE_ROLE, isRole, type Permission, type Role, ROLES } from "../config/roles.js";
+import { ROLE_DEFINITIONS, isRole, type Permission, type Role, ROLES } from "../config/roles.js";
 import { organizationCategory, type InterviewType } from "../config/organizations.js";
 
 /**
@@ -196,7 +196,6 @@ export function canAssignRole(actor: Principal, target: Principal, role: Role): 
 export function canChangeRoles(actor: Principal, target: Principal, nextRoles: readonly Role[]): Decision {
   const current = new Set(validRoles(target.roles));
   const next = new Set(nextRoles);
-  if (next.size === 0) return deny("An administrator must keep at least one role.");
   const added = [...next].filter((r) => !current.has(r));
   const removed = [...current].filter((r) => !next.has(r));
   if (added.length === 0 && removed.length === 0) return deny("No role changes were requested.");
@@ -210,9 +209,9 @@ export function canChangeRoles(actor: Principal, target: Principal, nextRoles: r
 /** Roles a newly created account may start with when created by `actor`. */
 export function canCreateAccountWithRoles(actor: Principal, roles: readonly Role[]): Decision {
   if (!hasPermission(actor, "admins.create")) return deny("You do not have permission to create administrator accounts.");
+  if (roles.length === 0) return deny("Choose at least one role for the new account.");
   const assignable = new Set(assignableRoles(actor));
   for (const role of roles) {
-    if (role === BASE_ROLE) continue;
     if (!assignable.has(role)) return deny(`You cannot create an account with the ${roleLabel(role)} role.`);
   }
   return allow;

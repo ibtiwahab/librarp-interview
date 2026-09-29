@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { FilterX, History, Search, SlidersHorizontal } from "lucide-react";
+import { FilterX, History, Search, SlidersHorizontal, Video } from "lucide-react";
 import { useInterviewers, useInterviews, useOrganizations } from "@/hooks/queries";
 import { useUrlState } from "@/hooks/use-url-state";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -190,7 +190,10 @@ function HistoryView() {
                         onClick={() => router.push(i.status === "IN_PROGRESS" ? `/interviews/${i.id}` : `/interviews/${i.id}`)}
                       >
                         <TD>
-                          <div className="font-medium">{i.candidate.name}</div>
+                          <div className="flex items-center gap-1.5 font-medium">
+                            {i.candidate.name}
+                            {i.recordingLinks?.length > 0 && <Video className="size-3.5 text-primary" aria-label="Recording linked" />}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {[i.candidate.discordUsername, i.candidate.inGameName].filter(Boolean).join(" · ") || "—"}
                           </div>

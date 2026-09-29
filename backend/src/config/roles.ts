@@ -14,7 +14,6 @@ export const ROLES = [
   "STATE_CURATOR",
   "CRIME_CURATOR",
   "SUPPORT_CURATOR",
-  "SERVER_ADMIN",
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -73,7 +72,6 @@ const BELOW_EXECUTIVE: Role[] = [
   "STATE_CURATOR",
   "CRIME_CURATOR",
   "SUPPORT_CURATOR",
-  "SERVER_ADMIN",
 ];
 
 const BELOW_HEAD_ADMIN: Role[] = [
@@ -82,7 +80,6 @@ const BELOW_HEAD_ADMIN: Role[] = [
   "STATE_CURATOR",
   "CRIME_CURATOR",
   "SUPPORT_CURATOR",
-  "SERVER_ADMIN",
 ];
 
 export const ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
@@ -145,7 +142,7 @@ export const ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
       "questions.manage.state",
     ],
     assignableRoles: ["STATE_CURATOR"],
-    manageableRoles: ["SERVER_ADMIN", "STATE_CURATOR"],
+    manageableRoles: ["STATE_CURATOR"],
   },
   CHIEF_CURATOR_CRIME: {
     role: "CHIEF_CURATOR_CRIME",
@@ -164,7 +161,7 @@ export const ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
       "questions.manage.crime",
     ],
     assignableRoles: ["CRIME_CURATOR"],
-    manageableRoles: ["SERVER_ADMIN", "CRIME_CURATOR"],
+    manageableRoles: ["CRIME_CURATOR"],
   },
   STATE_CURATOR: {
     role: "STATE_CURATOR",
@@ -190,26 +187,21 @@ export const ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
     role: "SUPPORT_CURATOR",
     label: "Support Curator",
     shortLabel: "Support Curator",
-    description: "Conducts interviews for Server Admin candidates.",
+    description: "Conducts Admin interviews (Admin Assistant and Server Admin candidates).",
     level: 40,
     permissions: ["interviews.conduct.admin"],
     assignableRoles: [],
     manageableRoles: [],
   },
-  SERVER_ADMIN: {
-    role: "SERVER_ADMIN",
-    label: "Server Admin",
-    shortLabel: "Server Admin",
-    description: "Base staff account. Gains interview access when a curator role is added.",
-    level: 10,
-    permissions: [],
-    assignableRoles: [],
-    manageableRoles: [],
-  },
 };
 
-/** Every newly created account starts with this role. */
-export const BASE_ROLE: Role = "SERVER_ADMIN";
+/**
+ * Roles that no longer exist. They are stripped from accounts on startup but may
+ * still appear in historical role-change records.
+ */
+export const RETIRED_ROLES: Record<string, string> = {
+  SERVER_ADMIN: "Server Admin (retired role)",
+};
 
 export function isRole(value: unknown): value is Role {
   return typeof value === "string" && (ROLES as readonly string[]).includes(value);

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
 import { Notice } from "@/components/ui/feedback";
+import { RecordingLinksEditor, normalizeLinks } from "./recording-links";
 import type { FinalStatus, InterviewDetail, InterviewProgress, InterviewStatus } from "@/types/api";
 
 const ICONS: Record<FinalStatus, React.ComponentType<{ className?: string }>> = {
@@ -72,6 +73,7 @@ export function CompleteInterviewDialog({
   const [finalComments, setFinalComments] = React.useState(interview.finalComments);
   const [strengths, setStrengths] = React.useState(interview.strengths);
   const [concerns, setConcerns] = React.useState(interview.concerns);
+  const [links, setLinks] = React.useState<string[]>(interview.recordingLinks ?? []);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -82,11 +84,16 @@ export function CompleteInterviewDialog({
       setError("Choose the final result.");
       return;
     }
+    const recording = normalizeLinks(links);
+    if (recording.error) {
+      setError(recording.error);
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
       await beforeSubmit?.();
-      await interviewsService.complete(interview.id, { status, finalComments, strengths, concerns });
+      await interviewsService.complete(interview.id, { status, finalComments, strengths, concerns, recordingLinks: recording.links });
       await queryClient.invalidateQueries({ queryKey: ["interviews"] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       try {
@@ -156,6 +163,9 @@ export function CompleteInterviewDialog({
               <Textarea id="co" rows={3} value={concerns} onChange={(e) => setConcerns(e.target.value)} />
             </Field>
           </div>
+          <Field label="Recording / stream link" hint="YouTube, Medal, Google Drive… You can still add or change this later from the interview record.">
+            <RecordingLinksEditor value={links} onChange={setLinks} />
+          </Field>
           {error && (
             <Notice tone="danger" icon={AlertTriangle}>
               {error}

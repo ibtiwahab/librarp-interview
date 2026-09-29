@@ -9,6 +9,7 @@ import {
   completeInterviewSchema,
   listInterviewsQuery,
   startInterviewSchema,
+  updateRecordSchema,
 } from "../validators/interview.validators.js";
 
 export async function list(req: Request, res: Response) {
@@ -31,6 +32,9 @@ export async function autosave(req: Request, res: Response) {
 }
 export async function complete(req: Request, res: Response) {
   return ok(res, await interviewService.completeInterview(req, parse(idParams, req.params).id, parse(completeInterviewSchema, req.body)));
+}
+export async function updateRecord(req: Request, res: Response) {
+  return ok(res, await interviewService.updateRecord(req, parse(idParams, req.params).id, parse(updateRecordSchema, req.body)));
 }
 export async function remove(req: Request, res: Response) {
   await interviewService.deleteInterview(req, parse(idParams, req.params).id);

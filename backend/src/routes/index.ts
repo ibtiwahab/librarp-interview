@@ -103,6 +103,7 @@ export function buildRouter(): Router {
   interviewRouter.get("/:id", interviews.get);
   interviewRouter.patch("/:id", interviews.autosave);
   interviewRouter.post("/:id/complete", interviews.complete);
+  interviewRouter.patch("/:id/record", interviews.updateRecord);
   interviewRouter.delete("/:id", requirePermission("interviews.delete", "You do not have permission to delete interviews."), interviews.remove);
   api.use("/interviews", interviewRouter);
 

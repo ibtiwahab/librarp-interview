@@ -58,6 +58,8 @@ export interface IInterview {
   positionAppliedFor: string;
   interviewDate: Date;
   additionalNotes: string;
+  /** Links to the interview recording (YouTube, Medal, Google Drive…). */
+  recordingLinks: string[];
   interviewer: Types.ObjectId;
   interviewerSnapshot: { username: string; displayName: string };
   questionSet?: Types.ObjectId | null;
@@ -112,6 +114,7 @@ const interviewSchema = new Schema<IInterview>(
     positionAppliedFor: { type: String, trim: true, default: "", maxlength: 100 },
     interviewDate: { type: Date, default: () => new Date() },
     additionalNotes: { type: String, default: "", maxlength: 5000 },
+    recordingLinks: { type: [String], default: [] },
     interviewer: { type: Schema.Types.ObjectId, ref: "AdminUser", required: true },
     interviewerSnapshot: { type: snapshotUserSchema, required: true },
     questionSet: { type: Schema.Types.ObjectId, ref: "QuestionSet", default: null },

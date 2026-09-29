@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, CornerDownRight, Gavel, PlayCircle, Printer, Trash2 } from "lucide-react";
-import { useInterview } from "@/hooks/queries";
-import { interviewsService } from "@/services/interviews";
+import { AlertTriangle, ArrowLeft, CornerDownRight, Gavel, Pencil, PlayCircle, Printer, Trash2, Video } from "lucide-react";
+import { qk, useInterview } from "@/hooks/queries";
+import { interviewsService, type AnswerPatch } from "@/services/interviews";
 import { errorMessage } from "@/lib/api-client";
 import { CANDIDATE_FIELD_META, INTERVIEW_TYPE_META, RESULT_META } from "@/lib/constants";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -17,9 +17,13 @@ import { useOrgLookup } from "@/components/domain/interview-row";
 import { OrgEmblem } from "@/components/domain/org-emblem";
 import { StatusBadge } from "@/components/domain/badges";
 import { CompleteInterviewDialog, ProgressSummary } from "@/components/interviews/complete-dialog";
+import { ResultPicker } from "@/components/interviews/live-parts";
+import { RecordingLinksEditor, RecordingLinksList, normalizeLinks } from "@/components/interviews/recording-links";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/input";
+import { Field } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ErrorState, Skeleton } from "@/components/ui/feedback";
+import { ErrorState, Notice, Skeleton } from "@/components/ui/feedback";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -28,6 +32,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/dialog";
+import type { InterviewDetail, QuestionResult } from "@/types/api";
 
 function Fact({ label, value, mono }: { label: string; value?: React.ReactNode; mono?: boolean }) {
   if (value === undefined || value === null || value === "") return null;
@@ -50,6 +55,32 @@ function TextBlock({ title, text }: { title: string; text: string }) {
   );
 }
 
+interface AnswerDraft {
+  candidateAnswerNotes: string;
+  interviewerNotes: string;
+  result: QuestionResult;
+}
+
+interface Draft {
+  links: string[];
+  finalComments: string;
+  strengths: string;
+  concerns: string;
+  answers: Record<string, AnswerDraft>;
+}
+
+function draftFrom(i: InterviewDetail): Draft {
+  return {
+    links: i.recordingLinks ?? [],
+    finalComments: i.finalComments,
+    strengths: i.strengths,
+    concerns: i.concerns,
+    answers: Object.fromEntries(
+      i.questions.map((q) => [q.id, { candidateAnswerNotes: q.candidateAnswerNotes, interviewerNotes: q.interviewerNotes, result: q.result }]),
+    ),
+  };
+}
+
 export default function InterviewRecordPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -59,6 +90,11 @@ export default function InterviewRecordPage() {
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [decideOpen, setDecideOpen] = React.useState(false);
+  // Edit mode for an interview whose decision has already been recorded.
+  const [draft, setDraft] = React.useState<Draft | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+  const editing = draft !== null;
 
   if (isLoading) {
     return (
@@ -77,6 +113,51 @@ export default function InterviewRecordPage() {
   }
 
   const org = orgOf(i.organization);
+
+  const startEditing = () => {
+    setSaveError(null);
+    setDraft(draftFrom(i));
+  };
+
+  const setAnswer = (qid: string, patch: Partial<AnswerDraft>) =>
+    setDraft((d) => (d ? { ...d, answers: { ...d.answers, [qid]: { ...d.answers[qid]!, ...patch } } } : d));
+
+  const save = async () => {
+    if (!draft) return;
+    const recording = normalizeLinks(draft.links);
+    if (recording.error) {
+      setSaveError(recording.error);
+      return;
+    }
+    // Only send answers that actually changed.
+    const answers: AnswerPatch[] = [];
+    for (const q of i.questions) {
+      const a = draft.answers[q.id]!;
+      if (a.candidateAnswerNotes !== q.candidateAnswerNotes || a.interviewerNotes !== q.interviewerNotes || a.result !== q.result) {
+        answers.push({ id: q.id, ...a });
+      }
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const updated = await interviewsService.updateRecord(i.id, {
+        recordingLinks: recording.links,
+        finalComments: draft.finalComments,
+        strengths: draft.strengths,
+        concerns: draft.concerns,
+        ...(answers.length ? { answers } : {}),
+      });
+      queryClient.setQueryData(qk.interview(i.id), updated);
+      await queryClient.invalidateQueries({ queryKey: ["interviews", "list"] });
+      toast.success("Interview updated", { description: "Your changes were saved and logged." });
+      setDraft(null);
+    } catch (err) {
+      setSaveError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const doDelete = async () => {
     setDeleting(true);
     try {
@@ -111,31 +192,84 @@ export default function InterviewRecordPage() {
         description={`${org.name} · ${INTERVIEW_TYPE_META[i.interviewType].label} · Interviewed by ${i.interviewer.displayName} · ${formatDate(i.interviewDate)}`}
         actions={
           <div className="no-print flex flex-wrap gap-2">
-            {i.status === "IN_PROGRESS" && i.permissions.canEdit && (
-              <Button asChild>
-                <Link href={`/interviews/${i.id}/live`}>
-                  <PlayCircle /> Resume interview
-                </Link>
-              </Button>
-            )}
-            {i.status === "ON_HOLD" && i.permissions.canDecide && (
-              <Button onClick={() => setDecideOpen(true)}>
-                <Gavel /> Resolve decision
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => window.print()}>
-              <Printer /> Print
-            </Button>
-            {i.permissions.canDelete && (
-              <Button variant="destructive-ghost" onClick={() => setConfirmDelete(true)}>
-                <Trash2 /> Delete
-              </Button>
+            {editing ? (
+              <>
+                <Button variant="secondary" onClick={() => setDraft(null)} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button onClick={save} loading={saving}>
+                  Save changes
+                </Button>
+              </>
+            ) : (
+              <>
+                {i.status === "IN_PROGRESS" && i.permissions.canEdit && (
+                  <Button asChild>
+                    <Link href={`/interviews/${i.id}/live`}>
+                      <PlayCircle /> Resume interview
+                    </Link>
+                  </Button>
+                )}
+                {i.status === "ON_HOLD" && i.permissions.canDecide && (
+                  <Button onClick={() => setDecideOpen(true)}>
+                    <Gavel /> Resolve decision
+                  </Button>
+                )}
+                {i.permissions.canEditRecord && (
+                  <Button variant="secondary" onClick={startEditing}>
+                    <Pencil /> Edit
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => window.print()}>
+                  <Printer /> Print
+                </Button>
+                {i.permissions.canDelete && (
+                  <Button variant="destructive-ghost" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 /> Delete
+                  </Button>
+                )}
+              </>
             )}
           </div>
         }
       />
       <PageBody className="grid gap-6 xl:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
+          {editing && (
+            <Notice tone="info" icon={Pencil} className="no-print">
+              You&apos;re editing a submitted interview. You can change the recording links, answers and written assessment — the decision (
+              {i.status.replace("_", " ").toLowerCase()}) stays as recorded. All edits are logged.
+            </Notice>
+          )}
+          {saveError && (
+            <Notice tone="danger" icon={AlertTriangle}>
+              {saveError}
+            </Notice>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="size-4 text-primary" /> Recording
+              </CardTitle>
+              {!editing && i.permissions.canEditRecord && i.recordingLinks.length === 0 && (
+                <Button variant="ghost" size="sm" className="no-print" onClick={startEditing}>
+                  Add link
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <RecordingLinksEditor value={draft.links} onChange={(links) => setDraft((d) => (d ? { ...d, links } : d))} />
+              ) : (
+                <RecordingLinksList
+                  links={i.recordingLinks}
+                  emptyText={i.permissions.canEditRecord ? "No recording linked yet — use Edit to add one." : "No recording linked."}
+                />
+              )}
+            </CardContent>
+          </Card>
+
           {i.status !== "IN_PROGRESS" && (
             <Card>
               <CardHeader>
@@ -146,11 +280,29 @@ export default function InterviewRecordPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <TextBlock title="Final comments" text={i.finalComments} />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <TextBlock title="Strengths" text={i.strengths} />
-                  <TextBlock title="Concerns" text={i.concerns} />
-                </div>
+                {editing ? (
+                  <>
+                    <Field label="Final comments">
+                      <Textarea rows={3} value={draft.finalComments} onChange={(e) => setDraft((d) => (d ? { ...d, finalComments: e.target.value } : d))} />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Strengths">
+                        <Textarea rows={3} value={draft.strengths} onChange={(e) => setDraft((d) => (d ? { ...d, strengths: e.target.value } : d))} />
+                      </Field>
+                      <Field label="Concerns">
+                        <Textarea rows={3} value={draft.concerns} onChange={(e) => setDraft((d) => (d ? { ...d, concerns: e.target.value } : d))} />
+                      </Field>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <TextBlock title="Final comments" text={i.finalComments} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <TextBlock title="Strengths" text={i.strengths} />
+                      <TextBlock title="Concerns" text={i.concerns} />
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -165,55 +317,90 @@ export default function InterviewRecordPage() {
               </div>
             </CardHeader>
             <ol>
-              {i.questions.map((q, n) => (
-                <li key={q.id} className="border-b border-border px-5 py-4 last:border-b-0">
-                  <div className="flex items-start gap-3">
-                    <span className="tabular mt-0.5 w-7 shrink-0 font-mono text-xs text-subtle-foreground">{String(n + 1).padStart(2, "0")}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-[14px] font-medium">{q.questionText}</p>
-                        <span className={cn("rounded border px-1.5 py-px text-[11px] font-medium", RESULT_META[q.result].tone)}>
-                          {RESULT_META[q.result].label}
-                        </span>
+              {i.questions.map((q, n) => {
+                const a = editing ? draft.answers[q.id]! : null;
+                return (
+                  <li key={q.id} className="border-b border-border px-5 py-4 last:border-b-0">
+                    <div className="flex items-start gap-3">
+                      <span className="tabular mt-0.5 w-7 shrink-0 font-mono text-xs text-subtle-foreground">{String(n + 1).padStart(2, "0")}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <p className="text-[14px] font-medium">{q.questionText}</p>
+                          {!a && (
+                            <span className={cn("rounded border px-1.5 py-px text-[11px] font-medium", RESULT_META[q.result].tone)}>
+                              {RESULT_META[q.result].label}
+                            </span>
+                          )}
+                        </div>
+                        {q.category && <div className="mt-1 text-[11px] text-subtle-foreground">{q.category}</div>}
+                        {q.followUpPrompts.length > 0 && (
+                          <div className="mt-2 space-y-0.5">
+                            {q.followUpPrompts.map((f, k) => (
+                              <div key={k} className="flex gap-1.5 text-xs text-muted-foreground">
+                                <CornerDownRight className="mt-0.5 size-3 shrink-0" /> {f}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {a ? (
+                          <div className="mt-3 space-y-3">
+                            <ResultPicker value={a.result} onChange={(r) => setAnswer(q.id, { result: r })} />
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <Field label="Candidate answer">
+                                <Textarea rows={3} value={a.candidateAnswerNotes} onChange={(e) => setAnswer(q.id, { candidateAnswerNotes: e.target.value })} />
+                              </Field>
+                              <Field label="Interviewer notes">
+                                <Textarea rows={3} value={a.interviewerNotes} onChange={(e) => setAnswer(q.id, { interviewerNotes: e.target.value })} />
+                              </Field>
+                            </div>
+                            {q.expectedAnswer && (
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium text-primary/80">Expected:</span> {q.expectedAnswer}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          (q.candidateAnswerNotes || q.interviewerNotes || q.expectedAnswer) && (
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              {q.candidateAnswerNotes && (
+                                <div className="rounded-md border border-border bg-[#0c0c0f] px-3 py-2">
+                                  <div className="text-[10px] font-semibold tracking-wider text-subtle-foreground uppercase">Candidate answer</div>
+                                  <p className="mt-1 text-[13px] whitespace-pre-wrap">{q.candidateAnswerNotes}</p>
+                                </div>
+                              )}
+                              {q.interviewerNotes && (
+                                <div className="rounded-md border border-border bg-[#0c0c0f] px-3 py-2">
+                                  <div className="text-[10px] font-semibold tracking-wider text-subtle-foreground uppercase">Interviewer notes</div>
+                                  <p className="mt-1 text-[13px] whitespace-pre-wrap">{q.interviewerNotes}</p>
+                                </div>
+                              )}
+                              {q.expectedAnswer && (
+                                <div className="rounded-md border border-primary/15 bg-primary-soft/40 px-3 py-2 md:col-span-2">
+                                  <div className="text-[10px] font-semibold tracking-wider text-primary/80 uppercase">Expected answer</div>
+                                  <p className="mt-1 text-[13px] whitespace-pre-wrap text-secondary-foreground">{q.expectedAnswer}</p>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        )}
                       </div>
-                      {q.category && <div className="mt-1 text-[11px] text-subtle-foreground">{q.category}</div>}
-                      {q.followUpPrompts.length > 0 && (
-                        <div className="mt-2 space-y-0.5">
-                          {q.followUpPrompts.map((f, k) => (
-                            <div key={k} className="flex gap-1.5 text-xs text-muted-foreground">
-                              <CornerDownRight className="mt-0.5 size-3 shrink-0" /> {f}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {(q.candidateAnswerNotes || q.interviewerNotes || q.expectedAnswer) && (
-                        <div className="mt-3 grid gap-3 md:grid-cols-2">
-                          {q.candidateAnswerNotes && (
-                            <div className="rounded-md border border-border bg-[#0c0c0f] px-3 py-2">
-                              <div className="text-[10px] font-semibold tracking-wider text-subtle-foreground uppercase">Candidate answer</div>
-                              <p className="mt-1 text-[13px] whitespace-pre-wrap">{q.candidateAnswerNotes}</p>
-                            </div>
-                          )}
-                          {q.interviewerNotes && (
-                            <div className="rounded-md border border-border bg-[#0c0c0f] px-3 py-2">
-                              <div className="text-[10px] font-semibold tracking-wider text-subtle-foreground uppercase">Interviewer notes</div>
-                              <p className="mt-1 text-[13px] whitespace-pre-wrap">{q.interviewerNotes}</p>
-                            </div>
-                          )}
-                          {q.expectedAnswer && (
-                            <div className="rounded-md border border-primary/15 bg-primary-soft/40 px-3 py-2 md:col-span-2">
-                              <div className="text-[10px] font-semibold tracking-wider text-primary/80 uppercase">Expected answer</div>
-                              <p className="mt-1 text-[13px] whitespace-pre-wrap text-secondary-foreground">{q.expectedAnswer}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ol>
           </Card>
+
+          {editing && (
+            <div className="no-print flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setDraft(null)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={save} loading={saving}>
+                Save changes
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

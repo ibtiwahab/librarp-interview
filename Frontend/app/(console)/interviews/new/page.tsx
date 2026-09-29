@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/components/layout/app-shell";
 import { RequireCapability } from "@/components/layout/require-auth";
 import { OrgEmblem } from "@/components/domain/org-emblem";
+import { RecordingLinksEditor, normalizeLinks } from "@/components/interviews/recording-links";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
@@ -91,6 +92,7 @@ function CandidateStep({ org, onBack }: { org: Organization; onBack: () => void 
   const settings = useSettings();
   const sets = useQuestionSets({ organization: org.code });
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [recordingLinks, setRecordingLinks] = React.useState<string[]>([]);
 
   const fields = settings.data?.candidateFields;
   const schema = React.useMemo(() => {
@@ -143,6 +145,11 @@ function CandidateStep({ org, onBack }: { org: Organization; onBack: () => void 
 
   const onSubmit = form.handleSubmit(async (v) => {
     setSubmitError(null);
+    const recording = normalizeLinks(recordingLinks);
+    if (recording.error) {
+      setSubmitError(recording.error);
+      return;
+    }
     try {
       const interview = await interviewsService.start({
         organization: org.code,
@@ -159,6 +166,7 @@ function CandidateStep({ org, onBack }: { org: Organization; onBack: () => void 
         positionAppliedFor: v.positionAppliedFor,
         interviewDate: v.interviewDate,
         additionalNotes: v.additionalNotes,
+        recordingLinks: recording.links,
       });
       toast.success("Interview started", { description: `${v.name} · ${org.shortName}` });
       router.push(`/interviews/${interview.id}/live`);
@@ -231,6 +239,13 @@ function CandidateStep({ org, onBack }: { org: Organization; onBack: () => void 
               <Textarea id="additionalNotes" rows={3} placeholder={CANDIDATE_FIELD_META.additionalNotes.placeholder} {...form.register("additionalNotes")} />
             </Field>
           )}
+          <Field
+            label="Recording / stream link"
+            className="sm:col-span-2"
+            hint="Optional — YouTube, Medal, Google Drive, Twitch… You can also add or change it when finishing, or later from the interview record."
+          >
+            <RecordingLinksEditor value={recordingLinks} onChange={setRecordingLinks} />
+          </Field>
         </div>
       </Card>
 
@@ -312,12 +327,22 @@ function NewInterview() {
     <>
       <PageHeader
         eyebrow="New interview"
-        title={step === 0 ? "What kind of interview?" : step === 1 ? `Choose the ${INTERVIEW_TYPE_META[type!].short.toLowerCase()} organization` : "Candidate details"}
+        title={
+          step === 0
+            ? "What kind of interview?"
+            : step === 1
+              ? type === "ADMIN"
+                ? "Which admin position?"
+                : `Choose the ${INTERVIEW_TYPE_META[type!].short.toLowerCase()} organization`
+              : "Candidate details"
+        }
         description={
           step === 0
             ? "Only interview types your roles allow are shown."
             : step === 1
-              ? "Pick the organization the candidate is applying to lead."
+              ? type === "ADMIN"
+                ? "Admin Assistant or Server Admin — pick the position the candidate is applying for."
+                : "Pick the organization the candidate is applying to lead."
               : "Record who you're interviewing. Required fields are configured by senior administration."
         }
         actions={<Steps step={step} />}

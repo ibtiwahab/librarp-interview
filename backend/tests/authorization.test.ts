@@ -21,15 +21,16 @@ import {
 let seq = 0;
 const user = (...roles: Role[]): Principal => ({ id: `u${++seq}`, roles });
 
-const executive = user("EXECUTIVE_DIRECTOR", "SERVER_ADMIN");
-const headAdmin = user("HEAD_ADMIN", "SERVER_ADMIN");
-const chiefState = user("CHIEF_CURATOR_STATE", "SERVER_ADMIN");
-const chiefCrime = user("CHIEF_CURATOR_CRIME", "SERVER_ADMIN");
-const stateCurator = user("SERVER_ADMIN", "STATE_CURATOR");
-const crimeCurator = user("SERVER_ADMIN", "CRIME_CURATOR");
-const supportCurator = user("SERVER_ADMIN", "SUPPORT_CURATOR");
-const serverAdmin = user("SERVER_ADMIN");
-const multiRole = user("SERVER_ADMIN", "STATE_CURATOR", "SUPPORT_CURATOR");
+const executive = user("EXECUTIVE_DIRECTOR");
+const headAdmin = user("HEAD_ADMIN");
+const chiefState = user("CHIEF_CURATOR_STATE");
+const chiefCrime = user("CHIEF_CURATOR_CRIME");
+const stateCurator = user("STATE_CURATOR");
+const crimeCurator = user("CRIME_CURATOR");
+const supportCurator = user("SUPPORT_CURATOR");
+/** An account with no roles (e.g. one that only held the retired Server Admin role). */
+const serverAdmin = user();
+const multiRole = user("STATE_CURATOR", "SUPPORT_CURATOR");
 
 const STATE_ORGS = ["LSPD", "SAHP", "GOV", "EMS", "FIB"];
 const CRIME_ORGS = ["FAMILIES", "BALLAS", "MARABUNTA", "VAGOS", "BLOODS"];
@@ -43,13 +44,14 @@ describe("interview permission matrix", () => {
     ["State Curator", stateCurator, true, false, false],
     ["Crime Curator", crimeCurator, false, true, false],
     ["Support Curator", supportCurator, false, false, true],
-    ["Server Admin", serverAdmin, false, false, false],
+    ["Account with no roles", serverAdmin, false, false, false],
   ];
 
   it.each(matrix)("%s → state/crime/admin", (_name, p, state, crime, admin) => {
     for (const org of STATE_ORGS) expect(canInterviewOrganization(p, org)).toBe(state);
     for (const org of CRIME_ORGS) expect(canInterviewOrganization(p, org)).toBe(crime);
     expect(canInterviewOrganization(p, "SERVER_ADMIN")).toBe(admin);
+    expect(canInterviewOrganization(p, "ADMIN_ASSISTANT")).toBe(admin);
   });
 
   it("rejects unknown organizations", () => {
@@ -62,19 +64,20 @@ describe("interview permission matrix", () => {
   it("Support Curator starting Ballas interview → denied", () => {
     expect(canInterviewOrganization(supportCurator, "BALLAS")).toBe(false);
   });
-  it("Server Admin starting EMS interview → denied", () => {
+  it("account with no roles starting EMS interview → denied", () => {
     expect(canInterviewOrganization(serverAdmin, "EMS")).toBe(false);
   });
-  it("Server Admin gains State access when State Curator is added", () => {
-    expect(canInterviewOrganization({ id: "x", roles: ["SERVER_ADMIN", "STATE_CURATOR"] }, "EMS")).toBe(true);
+  it("gains State access once State Curator is added", () => {
+    expect(canInterviewOrganization({ id: "x", roles: ["STATE_CURATOR"] }, "EMS")).toBe(true);
   });
 });
 
-describe("multi-role administrator [SERVER_ADMIN, STATE_CURATOR, SUPPORT_CURATOR]", () => {
+describe("multi-role administrator [STATE_CURATOR, SUPPORT_CURATOR]", () => {
   it("can conduct FIB, EMS and Admin interviews", () => {
     expect(canInterviewOrganization(multiRole, "FIB")).toBe(true);
     expect(canInterviewOrganization(multiRole, "EMS")).toBe(true);
     expect(canInterviewOrganization(multiRole, "SERVER_ADMIN")).toBe(true);
+    expect(canInterviewOrganization(multiRole, "ADMIN_ASSISTANT")).toBe(true);
   });
   it("cannot conduct Families interviews", () => {
     expect(canInterviewOrganization(multiRole, "FAMILIES")).toBe(false);
@@ -139,16 +142,16 @@ describe("privilege escalation attempts", () => {
     expect(canAssignRole(headAdmin, executive, "SUPPORT_CURATOR").allowed).toBe(false);
   });
   it("canChangeRoles rejects a diff containing any disallowed role", () => {
-    const target = user("SERVER_ADMIN");
-    expect(canChangeRoles(chiefState, target, ["SERVER_ADMIN", "STATE_CURATOR"]).allowed).toBe(true);
-    expect(canChangeRoles(chiefState, target, ["SERVER_ADMIN", "STATE_CURATOR", "CRIME_CURATOR"]).allowed).toBe(false);
+    const target = user();
+    expect(canChangeRoles(chiefState, target, ["STATE_CURATOR"]).allowed).toBe(true);
+    expect(canChangeRoles(chiefState, target, ["STATE_CURATOR", "CRIME_CURATOR"]).allowed).toBe(false);
     expect(canChangeRoles(chiefState, target, []).allowed).toBe(false);
   });
   it("account creation is limited to assignable roles", () => {
-    expect(canCreateAccountWithRoles(chiefState, ["SERVER_ADMIN"]).allowed).toBe(true);
-    expect(canCreateAccountWithRoles(chiefState, ["SERVER_ADMIN", "STATE_CURATOR"]).allowed).toBe(true);
-    expect(canCreateAccountWithRoles(chiefState, ["SERVER_ADMIN", "HEAD_ADMIN"]).allowed).toBe(false);
-    expect(canCreateAccountWithRoles(stateCurator, ["SERVER_ADMIN"]).allowed).toBe(false);
+    expect(canCreateAccountWithRoles(chiefState, []).allowed).toBe(false);
+    expect(canCreateAccountWithRoles(chiefState, ["STATE_CURATOR"]).allowed).toBe(true);
+    expect(canCreateAccountWithRoles(chiefState, ["HEAD_ADMIN"]).allowed).toBe(false);
+    expect(canCreateAccountWithRoles(stateCurator, ["STATE_CURATOR"]).allowed).toBe(false);
     expect(canCreateAccountWithRoles(headAdmin, ["EXECUTIVE_DIRECTOR"]).allowed).toBe(false);
   });
 });
@@ -165,7 +168,7 @@ describe("account management hierarchy", () => {
     expect(canManageUser(executive, headAdmin, "delete").allowed).toBe(true);
   });
   it("Head Admin cannot delete another Head Admin", () => {
-    expect(canManageUser(headAdmin, user("HEAD_ADMIN", "SERVER_ADMIN"), "delete").allowed).toBe(false);
+    expect(canManageUser(headAdmin, user("HEAD_ADMIN"), "delete").allowed).toBe(false);
   });
   it("Chief State Curator can delete a State Curator but not a Crime Curator", () => {
     expect(canManageUser(chiefState, stateCurator, "delete").allowed).toBe(true);
@@ -180,11 +183,11 @@ describe("account management hierarchy", () => {
   });
   it("curators and server admins cannot manage anyone", () => {
     expect(canManageUser(stateCurator, serverAdmin, "delete").allowed).toBe(false);
-    expect(canManageUser(serverAdmin, user("SERVER_ADMIN"), "disable").allowed).toBe(false);
+    expect(canManageUser(serverAdmin, user(), "disable").allowed).toBe(false);
   });
   it("authority level is the max across roles", () => {
-    expect(authorityLevel(["SERVER_ADMIN", "STATE_CURATOR"])).toBe(40);
-    expect(authorityLevel(["SERVER_ADMIN", "HEAD_ADMIN"])).toBe(80);
+    expect(authorityLevel(["STATE_CURATOR"])).toBe(40);
+    expect(authorityLevel(["HEAD_ADMIN"])).toBe(80);
     expect(authorityLevel(["NOT_A_ROLE"])).toBe(0);
   });
 });
@@ -204,7 +207,7 @@ describe("interviews, question bank and audit", () => {
     expect(canViewInterview(headAdmin, { interviewType: "ADMIN", interviewerId: "other" })).toBe(true);
   });
   it("interviewer loses edit rights if their conduct permission is revoked", () => {
-    const formerCurator = { id: "fc", roles: ["SERVER_ADMIN"] };
+    const formerCurator = { id: "fc", roles: [] };
     expect(canModifyInterview(formerCurator, { interviewType: "STATE", interviewerId: "fc" })).toBe(false);
   });
   it("question bank management is scoped by category", () => {
@@ -220,7 +223,7 @@ describe("interviews, question bank and audit", () => {
     expect(hasPermission(serverAdmin, "audit.view.all")).toBe(false);
   });
   it("ignores unknown role strings smuggled into a principal", () => {
-    const forged = { id: "f", roles: ["SERVER_ADMIN", "SUPER_ADMIN", "root"] };
+    const forged = { id: "f", roles: ["SUPER_ADMIN", "root"] };
     expect(capabilities(forged).canCreateAdmins).toBe(false);
     expect(canInterviewOrganization(forged, "FIB")).toBe(false);
   });

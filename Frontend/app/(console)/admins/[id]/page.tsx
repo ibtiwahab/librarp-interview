@@ -136,7 +136,7 @@ function AdminProfile() {
             </CardHeader>
             <CardContent>
               <dl className="grid gap-3">
-                <Fact label="Highest role">{ROLE_META[a.roles[0]!]?.label ?? "—"}</Fact>
+                <Fact label="Highest role">{a.roles[0] ? ROLE_META[a.roles[0]].label : "No roles"}</Fact>
                 <Fact label="Created">
                   {formatDateTime(a.createdAt)}
                   {a.createdBy && <span className="block text-xs text-muted-foreground">by {a.createdBy.displayName}</span>}

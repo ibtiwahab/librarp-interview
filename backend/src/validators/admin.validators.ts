@@ -36,7 +36,7 @@ export const createAdminSchema = z.object({
   discordId,
   /** Omit to have the server generate a one-time temporary password. */
   password: passwordSchema.optional(),
-  roles: z.array(roleSchema).max(8).default([]),
+  roles: z.array(roleSchema).min(1, "Choose at least one role for the new account.").max(8),
 });
 
 export const updateAdminSchema = z
@@ -48,7 +48,8 @@ export const updateAdminSchema = z
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "No changes were provided." });
 
 export const setRolesSchema = z.object({
-  roles: z.array(roleSchema).min(1, "An administrator must keep at least one role.").max(8),
+  // May be empty: removing every role keeps the account but removes all access.
+  roles: z.array(roleSchema).max(8),
 });
 
 export const addRoleSchema = z.object({ role: roleSchema });

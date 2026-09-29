@@ -10,6 +10,7 @@ import { Question } from "../src/models/Question.js";
 import { AuditLog } from "../src/models/AuditLog.js";
 import { hashPassword } from "../src/utils/crypto.js";
 import { ensureOrganizations } from "../src/services/organization.service.js";
+import { runStartupMigrations } from "../src/services/migration.service.js";
 import type { Role } from "../src/config/roles.js";
 import type { InterviewType, OrganizationCode } from "../src/config/organizations.js";
 
@@ -25,15 +26,15 @@ const tokens: Record<string, string> = {};
 const ids: Record<string, string> = {};
 
 const USERS: Record<string, Role[]> = {
-  exec: ["EXECUTIVE_DIRECTOR", "SERVER_ADMIN"],
-  head: ["HEAD_ADMIN", "SERVER_ADMIN"],
-  chiefState: ["CHIEF_CURATOR_STATE", "SERVER_ADMIN"],
-  stateCur: ["SERVER_ADMIN", "STATE_CURATOR"],
-  crimeCur: ["SERVER_ADMIN", "CRIME_CURATOR"],
-  supportCur: ["SERVER_ADMIN", "SUPPORT_CURATOR"],
-  plain: ["SERVER_ADMIN"],
-  multi: ["SERVER_ADMIN", "STATE_CURATOR", "SUPPORT_CURATOR"],
-  target: ["SERVER_ADMIN"],
+  exec: ["EXECUTIVE_DIRECTOR"],
+  head: ["HEAD_ADMIN"],
+  chiefState: ["CHIEF_CURATOR_STATE"],
+  stateCur: ["STATE_CURATOR"],
+  crimeCur: ["CRIME_CURATOR"],
+  supportCur: ["SUPPORT_CURATOR"],
+  plain: [],
+  multi: ["STATE_CURATOR", "SUPPORT_CURATOR"],
+  target: [],
 };
 
 const auth = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -75,7 +76,8 @@ beforeAll(async () => {
   await seedSet("EMS", "STATE", ["What are the primary duties of EMS?"]);
   await seedSet("BALLAS", "CRIME", ["Why do you want to lead Ballas?"]);
   await seedSet("FAMILIES", "CRIME", ["Why do you want to lead Families?"]);
-  await seedSet("SERVER_ADMIN", "ADMIN", ["Why do you want to be an admin?"]);
+  await seedSet("SERVER_ADMIN", "ADMIN", ["Why do you want to be a Server Admin?"]);
+  await seedSet("ADMIN_ASSISTANT", "ADMIN", ["Why do you want to be an Admin Assistant?"]);
 }, 120_000);
 
 afterAll(async () => {
@@ -142,8 +144,8 @@ describe("interview start permissions (API level)", () => {
     const res = await request(app).post("/api/interviews").set(auth("stateCur")).send({ organization: "SERVER_ADMIN", candidate });
     expect(res.status).toBe(403);
   });
-  it("multi-role [SERVER_ADMIN, STATE_CURATOR, SUPPORT_CURATOR] can do FIB, EMS and Admin but not Families", async () => {
-    for (const organization of ["FIB", "EMS", "SERVER_ADMIN"]) {
+  it("multi-role [STATE_CURATOR, SUPPORT_CURATOR] can do FIB, EMS and both Admin kinds but not Families", async () => {
+    for (const organization of ["FIB", "EMS", "ADMIN_ASSISTANT", "SERVER_ADMIN"]) {
       const res = await request(app).post("/api/interviews").set(auth("multi")).send({ organization, candidate });
       expect(res.status, organization).toBe(201);
     }
@@ -154,7 +156,7 @@ describe("interview start permissions (API level)", () => {
 
 describe("role assignment escalation (API level)", () => {
   it("State Curator attempting to assign Head Admin → 403", async () => {
-    const res = await request(app).put(`/api/admins/${ids.target}/roles`).set(auth("stateCur")).send({ roles: ["SERVER_ADMIN", "HEAD_ADMIN"] });
+    const res = await request(app).put(`/api/admins/${ids.target}/roles`).set(auth("stateCur")).send({ roles: ["HEAD_ADMIN"] });
     expect(res.status).toBe(403);
   });
   it("Head Admin assigning Executive Director → 403", async () => {
@@ -169,7 +171,7 @@ describe("role assignment escalation (API level)", () => {
   it("Chief State Curator assigning State Curator → 200, then duplicate → 409", async () => {
     const ok = await request(app).post(`/api/admins/${ids.target}/roles`).set(auth("chiefState")).send({ role: "STATE_CURATOR" });
     expect(ok.status).toBe(200);
-    expect(ok.body.data.roles).toEqual(["STATE_CURATOR", "SERVER_ADMIN"]);
+    expect(ok.body.data.roles).toEqual(["STATE_CURATOR"]);
     const dup = await request(app).post(`/api/admins/${ids.target}/roles`).set(auth("chiefState")).send({ role: "STATE_CURATOR" });
     expect(dup.status).toBe(409);
     expect(dup.body.error.message).toBe("This administrator already has the State Curator role.");
@@ -206,7 +208,7 @@ describe("account lifecycle", () => {
       .set(auth("chiefState"))
       .send({ username: "recruit", displayName: "Recruit", roles: ["STATE_CURATOR"] });
     expect(created.status).toBe(201);
-    expect(created.body.data.admin.roles).toEqual(["STATE_CURATOR", "SERVER_ADMIN"]);
+    expect(created.body.data.admin.roles).toEqual(["STATE_CURATOR"]);
     const temp = created.body.data.temporaryPassword as string;
     expect(temp).toMatch(/^\S{4}-\S{4}-\S{4}-\S{4}$/);
 
@@ -222,7 +224,7 @@ describe("account lifecycle", () => {
   });
 
   it("accounts need only a username and password (no email)", async () => {
-    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "Minimal", password: "Short1pw", email: "x@y.z" });
+    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "Minimal", password: "Short1pw", roles: ["SUPPORT_CURATOR"], email: "x@y.z" });
     expect(created.status).toBe(201);
     expect(created.body.data.admin).toMatchObject({ username: "minimal", displayName: "minimal" });
     expect(created.body.data.admin).not.toHaveProperty("email");
@@ -230,8 +232,15 @@ describe("account lifecycle", () => {
     expect(login.status).toBe(200);
   });
 
+  it("new accounts must be given at least one role", async () => {
+    const res = await request(app).post("/api/admins").set(auth("exec")).send({ username: "noroles", password: "Short1pw", roles: [] });
+    expect(res.status).toBe(400);
+    const retired = await request(app).post("/api/admins").set(auth("exec")).send({ username: "retired", password: "Short1pw", roles: ["SERVER_ADMIN"] });
+    expect(retired.status).toBe(400);
+  });
+
   it("disabled accounts cannot sign in", async () => {
-    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "tobedisabled", displayName: "Dis", password: PASSWORD });
+    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "tobedisabled", displayName: "Dis", password: PASSWORD, roles: ["STATE_CURATOR"] });
     await request(app).post(`/api/admins/${created.body.data.admin.id}/disable`).set(auth("exec")).expect(200);
     const res = await request(app).post("/api/auth/login").send({ identifier: "tobedisabled", password: PASSWORD });
     expect(res.status).toBe(403);
@@ -239,7 +248,7 @@ describe("account lifecycle", () => {
   });
 
   it("soft-deleted accounts disappear and free their username", async () => {
-    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "ghost", displayName: "Ghost", password: PASSWORD });
+    const created = await request(app).post("/api/admins").set(auth("exec")).send({ username: "ghost", displayName: "Ghost", password: PASSWORD, roles: ["CRIME_CURATOR"] });
     const id = created.body.data.admin.id;
     await request(app).delete(`/api/admins/${id}`).set(auth("exec")).expect(200);
     expect((await request(app).get(`/api/admins/${id}`).set(auth("exec"))).status).toBe(404);
@@ -285,6 +294,64 @@ describe("interview lifecycle, snapshots and deletion", () => {
     expect(again.body.error.message).toBe("This interview was already completed.");
     const redecide = await request(app).post(`/api/interviews/${i.id}/complete`).set(auth("stateCur")).send({ status: "FAILED" });
     expect(redecide.status).toBe(409);
+  });
+
+  it("accepts recording links at start and finish, and rejects non-http links", async () => {
+    const bad = await request(app)
+      .post("/api/interviews")
+      .set(auth("stateCur"))
+      .send({ organization: "FIB", candidate, recordingLinks: ["javascript:alert(1)"] });
+    expect(bad.status).toBe(400);
+
+    const started = await request(app)
+      .post("/api/interviews")
+      .set(auth("stateCur"))
+      .send({ organization: "FIB", candidate, recordingLinks: ["https://youtu.be/abc123"] });
+    expect(started.status).toBe(201);
+    expect(started.body.data.recordingLinks).toEqual(["https://youtu.be/abc123"]);
+
+    const done = await request(app)
+      .post(`/api/interviews/${started.body.data.id}/complete`)
+      .set(auth("stateCur"))
+      .send({ status: "PASSED", recordingLinks: ["https://youtu.be/abc123", "https://medal.tv/games/gta-v/clips/xyz"] });
+    expect(done.status).toBe(200);
+    expect(done.body.data.recordingLinks).toHaveLength(2);
+    expect(done.body.data.permissions.canEditRecord).toBe(true);
+  });
+
+  it("lets the interviewer edit links and answers after submitting, without changing the decision", async () => {
+    const started = await request(app).post("/api/interviews").set(auth("stateCur")).send({ organization: "EMS", candidate });
+    const i = started.body.data;
+
+    // Not allowed while still in progress.
+    const early = await request(app).patch(`/api/interviews/${i.id}/record`).set(auth("stateCur")).send({ recordingLinks: [] });
+    expect(early.status).toBe(409);
+
+    await request(app).post(`/api/interviews/${i.id}/complete`).set(auth("stateCur")).send({ status: "FAILED" }).expect(200);
+
+    const edited = await request(app)
+      .patch(`/api/interviews/${i.id}/record`)
+      .set(auth("stateCur"))
+      .send({
+        recordingLinks: ["https://drive.google.com/file/d/123/view"],
+        answers: [{ id: i.questions[0].id, candidateAnswerNotes: "Added after review", result: "PARTIAL" }],
+        finalComments: "Updated after watching the recording.",
+      });
+    expect(edited.status).toBe(200);
+    expect(edited.body.data.status).toBe("FAILED");
+    expect(edited.body.data.recordingLinks).toEqual(["https://drive.google.com/file/d/123/view"]);
+    expect(edited.body.data.questions[0]).toMatchObject({ candidateAnswerNotes: "Added after review", result: "PARTIAL" });
+    expect(await AuditLog.exists({ action: "INTERVIEW_UPDATED", targetId: i.id })).toBeTruthy();
+
+    // A status field in the body is ignored — the decision cannot be changed here.
+    await request(app).patch(`/api/interviews/${i.id}/record`).set(auth("stateCur")).send({ status: "PASSED", concerns: "x" }).expect(200);
+    expect((await request(app).get(`/api/interviews/${i.id}`).set(auth("stateCur"))).body.data.status).toBe("FAILED");
+
+    // Another curator of the same category cannot edit someone else's record.
+    const other = await request(app).patch(`/api/interviews/${i.id}/record`).set(auth("multi")).send({ recordingLinks: [] });
+    expect(other.status).toBe(403);
+    // A senior administrator can.
+    await request(app).patch(`/api/interviews/${i.id}/record`).set(auth("head")).send({ strengths: "Calm" }).expect(200);
   });
 
   it("only authorized roles can delete; deleted interviews disappear", async () => {
@@ -349,6 +416,30 @@ describe("question bank permissions", () => {
       .set(auth("stateCur"))
       .attach("file", Buffer.from("1. Q?"), "q.txt");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("retired Server Admin role migration", () => {
+  it("strips the retired role but keeps other roles and history", async () => {
+    const hash = await hashPassword(PASSWORD);
+    const now = new Date();
+    const base = { passwordHash: hash, active: true, mustChangePassword: false, tokenVersion: 0, failedLoginAttempts: 0, deletedAt: null, createdAt: now, updatedAt: now };
+    await AdminUser.collection.insertMany([
+      { ...base, username: "legacy1", displayName: "Legacy One", roles: ["SERVER_ADMIN", "STATE_CURATOR"], roleHistory: [{ role: "SERVER_ADMIN", action: "ADDED", byName: "x", at: now }] },
+      { ...base, username: "legacy2", displayName: "Legacy Two", roles: ["SERVER_ADMIN"], roleHistory: [] },
+    ]);
+    await runStartupMigrations();
+    const one = await AdminUser.findOne({ username: "legacy1" }).lean();
+    const two = await AdminUser.findOne({ username: "legacy2" }).lean();
+    expect(one?.roles).toEqual(["STATE_CURATOR"]);
+    expect(one?.roleHistory[0]?.role).toBe("SERVER_ADMIN");
+    expect(two?.roles).toEqual([]);
+
+    // An account left with no roles can still sign in, but has no permissions.
+    const login = await request(app).post("/api/auth/login").send({ identifier: "legacy2", password: PASSWORD });
+    expect(login.status).toBe(200);
+    expect(login.body.data.user.permissions).toEqual([]);
+    expect((await request(app).post("/api/interviews").set("Authorization", `Bearer ${login.body.data.accessToken}`).send({ organization: "FIB", candidate })).status).toBe(403);
   });
 });
 

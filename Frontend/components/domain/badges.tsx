@@ -1,10 +1,18 @@
 import { Badge } from "@/components/ui/badge";
-import { ROLE_META, ROLE_ORDER, STATUS_META } from "@/lib/constants";
+import { ROLE_META, ROLE_ORDER, STATUS_META, roleLabel } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { InterviewStatus, Role } from "@/types/api";
 
-export function RoleBadge({ role, short = false, className }: { role: Role; short?: boolean; className?: string }) {
-  const meta = ROLE_META[role];
+/** Accepts any role string so history entries for retired roles still render. */
+export function RoleBadge({ role, short = false, className }: { role: string; short?: boolean; className?: string }) {
+  const meta = ROLE_META[role as Role];
+  if (!meta) {
+    return (
+      <Badge tone="base" className={cn("line-through decoration-subtle-foreground/60", className)}>
+        {roleLabel(role)}
+      </Badge>
+    );
+  }
   return (
     <Badge tone={meta.tone} className={className}>
       {short ? meta.short : meta.label}
@@ -16,6 +24,13 @@ export function RoleList({ roles, short = false, max, className }: { roles: Role
   const sorted = ROLE_ORDER.filter((r) => roles.includes(r));
   const shown = max ? sorted.slice(0, max) : sorted;
   const hidden = sorted.length - shown.length;
+  if (sorted.length === 0) {
+    return (
+      <div className={cn("flex flex-wrap gap-1", className)}>
+        <Badge tone="base">No roles</Badge>
+      </div>
+    );
+  }
   return (
     <div className={cn("flex flex-wrap gap-1", className)}>
       {shown.map((r) => (

@@ -30,9 +30,11 @@ import type {
   completeInterviewSchema,
   listInterviewsQuery,
   startInterviewSchema,
+  updateRecordSchema,
 } from "../validators/interview.validators.js";
 
 type InterviewLean = IInterview & { _id: Types.ObjectId };
+type InterviewDoc = Awaited<ReturnType<typeof loadInterview>>;
 type QuestionLean = InterviewQuestion;
 
 function summarize(questions: QuestionLean[]) {
@@ -52,6 +54,7 @@ export function serializeInterviewSummary(i: InterviewLean) {
     candidate: i.candidate,
     positionAppliedFor: i.positionAppliedFor,
     interviewDate: i.interviewDate,
+    recordingLinks: i.recordingLinks ?? [],
     interviewer: { id: String(i.interviewer), ...i.interviewerSnapshot },
     questionSet: { id: i.questionSet ? String(i.questionSet) : null, name: i.questionSetSnapshot?.name ?? "" },
     status: i.status,
@@ -93,6 +96,9 @@ export function serializeInterview(i: InterviewLean, principal: Principal) {
       canEdit: i.status === "IN_PROGRESS" && canModifyInterview(principal, { interviewType: i.interviewType, interviewerId }),
       canDecide:
         STATUS_TRANSITIONS[i.status].length > 0 && canModifyInterview(principal, { interviewType: i.interviewType, interviewerId }),
+      // After the decision: fix up links, answers and comments (the decision itself stays).
+      canEditRecord:
+        i.status !== "IN_PROGRESS" && canModifyInterview(principal, { interviewType: i.interviewType, interviewerId }),
       canDelete: canDeleteInterview(principal),
     },
   };
@@ -168,6 +174,7 @@ export async function startInterview(req: Request, input: z.infer<typeof startIn
     positionAppliedFor: input.positionAppliedFor || getOrganizationConfig(input.organization)?.defaultPosition || "",
     interviewDate: input.interviewDate ?? new Date(),
     additionalNotes: input.additionalNotes,
+    recordingLinks: input.recordingLinks ?? [],
     interviewer: new Types.ObjectId(principal.id),
     interviewerSnapshot: { username: user?.username ?? "", displayName: user?.displayName ?? "" },
     questionSet: set._id,
@@ -282,6 +289,33 @@ function assertModifiable(principal: Principal, i: { interviewType: InterviewTyp
   }
 }
 
+type AnswerPatch = NonNullable<z.infer<typeof autosaveSchema>["answers"]>[number];
+
+/** Applies answer edits; returns how many questions actually changed. */
+function applyAnswers(interview: InterviewDoc, answers: AnswerPatch[]): number {
+  let changed = 0;
+  for (const a of answers) {
+    const q = interview.questions.id(a.id);
+    if (!q) throw new AppError("VALIDATION_ERROR", "A saved answer refers to a question that is not part of this interview.");
+    let touched = false;
+    if (a.candidateAnswerNotes !== undefined && a.candidateAnswerNotes !== q.candidateAnswerNotes) {
+      q.candidateAnswerNotes = a.candidateAnswerNotes;
+      touched = true;
+    }
+    if (a.interviewerNotes !== undefined && a.interviewerNotes !== q.interviewerNotes) {
+      q.interviewerNotes = a.interviewerNotes;
+      touched = true;
+    }
+    if (a.result !== undefined && a.result !== q.result) {
+      q.result = a.result;
+      q.answeredAt = a.result === "NOT_SCORED" ? null : new Date();
+      touched = true;
+    }
+    if (touched) changed++;
+  }
+  return changed;
+}
+
 export async function autosave(req: Request, id: string, input: z.infer<typeof autosaveSchema>) {
   const principal = req.auth!.principal;
   const interview = await loadInterview(id);
@@ -306,18 +340,8 @@ export async function autosave(req: Request, id: string, input: z.infer<typeof a
   if (input.currentIndex !== undefined) {
     interview.currentIndex = Math.min(input.currentIndex, Math.max(0, interview.questions.length - 1));
   }
-  if (input.answers) {
-    for (const a of input.answers) {
-      const q = interview.questions.id(a.id);
-      if (!q) throw new AppError("VALIDATION_ERROR", "A saved answer refers to a question that is not part of this interview.");
-      if (a.candidateAnswerNotes !== undefined) q.candidateAnswerNotes = a.candidateAnswerNotes;
-      if (a.interviewerNotes !== undefined) q.interviewerNotes = a.interviewerNotes;
-      if (a.result !== undefined) {
-        q.result = a.result;
-        q.answeredAt = a.result === "NOT_SCORED" ? null : new Date();
-      }
-    }
-  }
+  if (input.answers) applyAnswers(interview, input.answers);
+  if (input.recordingLinks !== undefined) interview.recordingLinks = input.recordingLinks;
   if (input.candidate) {
     for (const [k, v] of Object.entries(input.candidate)) {
       if (v !== undefined) interview.set(`candidate.${k}`, v);
@@ -350,6 +374,7 @@ export async function completeInterview(req: Request, id: string, input: z.infer
   interview.finalComments = input.finalComments;
   interview.strengths = input.strengths;
   interview.concerns = input.concerns;
+  if (input.recordingLinks !== undefined) interview.recordingLinks = input.recordingLinks;
   interview.decidedBy = new Types.ObjectId(principal.id);
   interview.decidedBySnapshot = { username: user?.username ?? "", displayName: user?.displayName ?? "" };
   interview.completedAt = new Date();
@@ -365,6 +390,51 @@ export async function completeInterview(req: Request, id: string, input: z.infer
     metadata: { from, to: input.status, organization: interview.organization, type: interviewTypeLabel(interview.interviewType) },
     req,
   });
+  return serializeInterview(interview.toObject() as InterviewLean, principal);
+}
+
+/**
+ * Edits after the decision was recorded: recording links, answers and the
+ * written assessment. The decision (status) itself cannot be changed here.
+ */
+export async function updateRecord(req: Request, id: string, input: z.infer<typeof updateRecordSchema>) {
+  const principal = req.auth!.principal;
+  const interview = await loadInterview(id);
+  if (!canModifyInterview(principal, { interviewType: interview.interviewType, interviewerId: String(interview.interviewer) })) {
+    throw forbidden("Only the interviewer who conducted this interview (or a senior administrator) can edit it.");
+  }
+  if (interview.status === "IN_PROGRESS") {
+    throw invalidState("This interview is still in progress. Continue it from the live interview screen.");
+  }
+
+  const changed: string[] = [];
+  if (input.recordingLinks !== undefined && JSON.stringify(input.recordingLinks) !== JSON.stringify(interview.recordingLinks ?? [])) {
+    interview.recordingLinks = input.recordingLinks;
+    changed.push("recordingLinks");
+  }
+  const answersChanged = input.answers ? applyAnswers(interview, input.answers) : 0;
+  if (answersChanged) changed.push("answers");
+  for (const key of ["finalComments", "strengths", "concerns"] as const) {
+    const v = input[key];
+    if (v !== undefined && v !== interview[key]) {
+      interview[key] = v;
+      changed.push(key);
+    }
+  }
+
+  if (changed.length) {
+    interview.lastSavedAt = new Date();
+    await interview.save();
+    await audit({
+      action: "INTERVIEW_UPDATED",
+      actor: actorFrom(req),
+      targetType: "Interview",
+      targetId: id,
+      targetLabel: `${interview.candidate.name} — ${interview.organization}`,
+      metadata: { changed, answersChanged, recordingLinks: interview.recordingLinks, status: interview.status },
+      req,
+    });
+  }
   return serializeInterview(interview.toObject() as InterviewLean, principal);
 }
 

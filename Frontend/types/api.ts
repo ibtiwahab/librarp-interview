@@ -5,8 +5,7 @@ export type Role =
   | "CHIEF_CURATOR_CRIME"
   | "STATE_CURATOR"
   | "CRIME_CURATOR"
-  | "SUPPORT_CURATOR"
-  | "SERVER_ADMIN";
+  | "SUPPORT_CURATOR";
 
 export type InterviewType = "STATE" | "CRIME" | "ADMIN";
 
@@ -21,6 +20,7 @@ export type OrganizationCode =
   | "MARABUNTA"
   | "VAGOS"
   | "BLOODS"
+  | "ADMIN_ASSISTANT"
   | "SERVER_ADMIN";
 
 export type InterviewStatus = "IN_PROGRESS" | "PASSED" | "FAILED" | "ON_HOLD" | "CANCELLED";
@@ -99,7 +99,8 @@ export interface AdminListItem extends PublicUser {
 }
 
 export interface RoleHistoryEntry {
-  role: Role;
+  /** May be a retired role (e.g. SERVER_ADMIN) in older history entries. */
+  role: string;
   action: "ADDED" | "REMOVED";
   by: string | null;
   byName: string;
@@ -212,6 +213,7 @@ export interface InterviewSummary {
   candidate: Candidate;
   positionAppliedFor: string;
   interviewDate: string;
+  recordingLinks: string[];
   interviewer: { id: string; username: string; displayName: string };
   questionSet: { id: string | null; name: string };
   status: InterviewStatus;
@@ -247,7 +249,7 @@ export interface InterviewDetail extends InterviewSummary {
   concerns: string;
   decidedBy: { id: string; username: string; displayName: string } | null;
   lastSavedAt: string | null;
-  permissions: { canEdit: boolean; canDecide: boolean; canDelete: boolean };
+  permissions: { canEdit: boolean; canDecide: boolean; canEditRecord: boolean; canDelete: boolean };
 }
 
 export interface CandidateFieldSetting {

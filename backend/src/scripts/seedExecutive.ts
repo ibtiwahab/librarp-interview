@@ -90,12 +90,11 @@ async function main() {
     username,
     displayName,
     passwordHash: await hashPassword(password),
-    roles: ["EXECUTIVE_DIRECTOR", "SERVER_ADMIN"],
+    roles: ["EXECUTIVE_DIRECTOR"],
     active: true,
     mustChangePassword: false,
     roleHistory: [
       { role: "EXECUTIVE_DIRECTOR", action: "ADDED", by: null, byName: "System bootstrap", at: new Date() },
-      { role: "SERVER_ADMIN", action: "ADDED", by: null, byName: "System bootstrap", at: new Date() },
     ],
   });
 

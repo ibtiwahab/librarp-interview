@@ -11,6 +11,7 @@ import { useOrgLookup } from "@/components/domain/interview-row";
 import { OrgEmblem } from "@/components/domain/org-emblem";
 import { StatusBadge } from "@/components/domain/badges";
 import { CompleteInterviewDialog } from "@/components/interviews/complete-dialog";
+import { RecordingLinksList } from "@/components/interviews/recording-links";
 import { QuestionCard, QuestionNavigator, ResultPicker, SaveIndicator, ShortcutHelp } from "@/components/interviews/live-parts";
 import { ConnectingScreen } from "@/components/layout/connecting-screen";
 import { Button } from "@/components/ui/button";
@@ -288,6 +289,10 @@ function LiveInterview({ interview }: { interview: InterviewDetail }) {
               <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-secondary-foreground">{interview.additionalNotes}</p>
             </div>
           )}
+          <div className="border-t border-border px-5 py-4">
+            <div className="mb-2 text-[11px] text-subtle-foreground">Recording</div>
+            <RecordingLinksList links={interview.recordingLinks} compact emptyText="None yet — add it when you finish." />
+          </div>
           <div className="border-t border-border px-5 py-4">
             <div className="mb-3 text-[11px] text-subtle-foreground">Running tally</div>
             <div className="space-y-2">

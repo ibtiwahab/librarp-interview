@@ -24,6 +24,7 @@ export const ORGANIZATION_CODES = [
   "MARABUNTA",
   "VAGOS",
   "BLOODS",
+  "ADMIN_ASSISTANT",
   "SERVER_ADMIN",
 ] as const;
 export type OrganizationCode = (typeof ORGANIZATION_CODES)[number];
@@ -165,8 +166,20 @@ export const ORGANIZATIONS: readonly OrganizationConfig[] = [
     active: true,
   },
   {
+    code: "ADMIN_ASSISTANT",
+    name: "Admin Assistant",
+    shortName: "Admin Assistant",
+    category: "ADMIN",
+    description: "Entry-level position on the Libra RP administration team.",
+    logo: "",
+    color: "#8c7cc9",
+    defaultPosition: "Admin Assistant",
+    order: 19,
+    active: true,
+  },
+  {
     code: "SERVER_ADMIN",
-    name: "Server Administration",
+    name: "Server Admin",
     shortName: "Server Admin",
     category: "ADMIN",
     description: "Libra RP server administration team.",

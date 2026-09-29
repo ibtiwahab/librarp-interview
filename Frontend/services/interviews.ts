@@ -34,6 +34,7 @@ export interface StartInterviewInput {
   positionAppliedFor?: string;
   interviewDate?: string;
   additionalNotes?: string;
+  recordingLinks?: string[];
 }
 
 export interface AnswerPatch {
@@ -59,6 +60,15 @@ export interface CompleteInput {
   finalComments: string;
   strengths: string;
   concerns: string;
+  recordingLinks?: string[];
+}
+
+export interface UpdateRecordInput {
+  recordingLinks?: string[];
+  answers?: AnswerPatch[];
+  finalComments?: string;
+  strengths?: string;
+  concerns?: string;
 }
 
 export const interviewsService = {
@@ -75,5 +85,6 @@ export const interviewsService = {
       timeoutMs: 70_000,
     }),
   complete: (id: string, input: CompleteInput) => http.post<InterviewDetail>(`/interviews/${id}/complete`, input),
+  updateRecord: (id: string, input: UpdateRecordInput) => http.patch<InterviewDetail>(`/interviews/${id}/record`, input),
   remove: (id: string) => http.delete<{ deleted: true }>(`/interviews/${id}`),
 };

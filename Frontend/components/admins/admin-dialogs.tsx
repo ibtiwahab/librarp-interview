@@ -58,13 +58,11 @@ export function RolePicker({
   value,
   onChange,
   assignable,
-  lockedRoles = [],
 }: {
   value: Role[];
   onChange: (roles: Role[]) => void;
   /** Roles the current actor may toggle (computed by the server). */
   assignable: Role[];
-  lockedRoles?: Role[];
 }) {
   const catalogue = useRoleCatalogue();
   if (catalogue.isLoading) return <Skeleton className="h-64 w-full" />;
@@ -74,13 +72,8 @@ export function RolePicker({
     <div className="grid gap-2 sm:grid-cols-2">
       {entries.map((r) => {
         const checked = value.includes(r.role);
-        const locked = lockedRoles.includes(r.role);
-        const canToggle = assignable.includes(r.role) && !locked;
-        const reason = locked
-          ? "Every account keeps the base Server Admin role."
-          : !canToggle
-            ? (r.reason ?? "You cannot assign or remove this role for this administrator.")
-            : null;
+        const canToggle = assignable.includes(r.role);
+        const reason = !canToggle ? (r.reason ?? "You cannot assign or remove this role for this administrator.") : null;
         const card = (
           <label
             className={cn(
@@ -148,7 +141,8 @@ export function CreateAdminDialog({ open, onOpenChange, assignable }: { open: bo
 /** Mounted fresh each time the dialog opens. */
 function CreateAdminForm({ onOpenChange, assignable }: { onOpenChange: (o: boolean) => void; assignable: Role[] }) {
   const queryClient = useQueryClient();
-  const [roles, setRoles] = React.useState<Role[]>(["SERVER_ADMIN"]);
+  // Pre-select the role when the creator can only grant one (e.g. a Chief Curator).
+  const [roles, setRoles] = React.useState<Role[]>(() => (assignable.length === 1 ? [...assignable] : []));
   const [error, setError] = React.useState<string | null>(null);
   const [created, setCreated] = React.useState<{ admin: AdminDetail; temporaryPassword: string | null } | null>(null);
   const form = useForm<CreateValues>({
@@ -163,7 +157,7 @@ function CreateAdminForm({ onOpenChange, assignable }: { onOpenChange: (o: boole
         username: v.username,
         displayName: v.displayName || undefined,
         password: v.passwordMode === "manual" ? v.password : undefined,
-        roles: roles.filter((r) => r !== "SERVER_ADMIN"),
+        roles,
       });
       await queryClient.invalidateQueries({ queryKey: ["admins"] });
       toast.success("Administrator created", { description: `${res.admin.displayName} (@${res.admin.username})` });
@@ -208,7 +202,7 @@ function CreateAdminForm({ onOpenChange, assignable }: { onOpenChange: (o: boole
           <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
             <DialogHeader>
               <DialogTitle>Create administrator</DialogTitle>
-              <DialogDescription>New accounts start as Server Admin. Add curator roles within your authority.</DialogDescription>
+              <DialogDescription>Choose at least one role within your authority. Roles can be changed later.</DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-5">
               {error && (
@@ -253,14 +247,15 @@ function CreateAdminForm({ onOpenChange, assignable }: { onOpenChange: (o: boole
               </div>
               <div className="space-y-2">
                 <div className="text-[13px] font-medium">Roles</div>
-                <RolePicker value={roles} onChange={setRoles} assignable={assignable} lockedRoles={["SERVER_ADMIN"]} />
+                <RolePicker value={roles} onChange={setRoles} assignable={assignable} />
+                {roles.length === 0 && <p className="text-xs text-muted-foreground">Select at least one role.</p>}
               </div>
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" loading={form.formState.isSubmitting}>
+              <Button type="submit" loading={form.formState.isSubmitting} disabled={roles.length === 0}>
                 Create administrator
               </Button>
             </DialogFooter>
@@ -317,13 +312,15 @@ function ManageRolesInner({ admin, onOpenChange }: AdminDialogProps<AdminListIte
             </Notice>
           )}
           <RolePicker value={roles} onChange={setRoles} assignable={admin.actions.assignableRoles} />
-          {roles.length === 0 && <p className="text-xs text-destructive">An administrator must keep at least one role.</p>}
+          {roles.length === 0 && (
+            <p className="text-xs text-warning">With no roles, this administrator can still sign in but can&apos;t conduct interviews or manage anything.</p>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={save} loading={saving} disabled={!changed || roles.length === 0}>
+          <Button onClick={save} loading={saving} disabled={!changed}>
             Save roles
           </Button>
         </DialogFooter>

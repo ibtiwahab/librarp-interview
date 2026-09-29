@@ -2,10 +2,12 @@ import { env } from "./config/env.js";
 import { connectDatabase, disconnectDatabase } from "./config/db.js";
 import { createApp } from "./app.js";
 import { ensureOrganizations } from "./services/organization.service.js";
+import { runStartupMigrations } from "./services/migration.service.js";
 
 async function main() {
   await connectDatabase();
   await ensureOrganizations();
+  await runStartupMigrations();
 
   const app = createApp();
   // Render (and most PaaS) inject PORT and require binding to 0.0.0.0.

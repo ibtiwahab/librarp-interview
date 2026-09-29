@@ -28,6 +28,7 @@ const envSchema = z
       .optional()
       .transform((v) => (v ? v : undefined)),
     TRUST_PROXY: proxyHops,
+    DNS_SERVERS: z.string().optional(),
   })
   .refine((e) => e.JWT_ACCESS_SECRET !== e.JWT_REFRESH_SECRET, {
     message: "JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different",
@@ -64,6 +65,10 @@ function loadEnv() {
       secure: isProd || e.COOKIE_SAMESITE === "none",
     },
     trustProxy: e.TRUST_PROXY ?? (isProd ? 1 : 0),
+    dnsServers: (e.DNS_SERVERS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     upload: {
       maxBytes: 10 * 1024 * 1024,
     },

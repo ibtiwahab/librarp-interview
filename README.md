@@ -2,7 +2,8 @@
 
 Internal staff platform for the **Libra RP** GTA V roleplay server. Senior staff use it to conduct
 leadership interviews for **State** organizations (LSPD, SAHP, GOV, EMS, FIB), **Crime** organizations
-(Families, Ballas, Marabunta, Vagos, Bloods) and **Server Admin** candidates; manage a question bank
+(Families, Ballas, Marabunta, Vagos, Bloods) and **Admin** candidates (Admin Assistant and Server Admin), with
+recording links (YouTube, Medal, Google Drive…) attached to each interview; manage a question bank
 (including importing questions from Word/PDF/Excel documents); and administer staff accounts and roles.
 
 It is designed to run entirely on **free tiers** — Vercel Hobby, Render Free, MongoDB Atlas M0 — and uses
@@ -256,12 +257,17 @@ compare role names.
 | State Curator | 40 | ✔ | – | – | – |
 | Crime Curator | 40 | – | ✔ | – | – |
 | Support Curator | 40 | – | – | ✔ | – |
-| Server Admin | 10 | – | – | – | – |
+
+Admin interviews come in two kinds — **Admin Assistant** and **Server Admin** — both conducted by anyone with Admin
+interview access (Support Curator, Head Admin, Executive Director).
 
 Rules enforced server-side:
 
-- Permissions are the **union** of all roles (e.g. `SERVER_ADMIN + STATE_CURATOR + SUPPORT_CURATOR` can run State
-  and Admin interviews, but not Crime ones).
+- Permissions are the **union** of all roles (e.g. `STATE_CURATOR + SUPPORT_CURATOR` can run State and Admin
+  interviews, but not Crime ones).
+- New accounts must be created with at least one role. Removing every role keeps the account but removes all access.
+- The former base role `SERVER_ADMIN` was retired: it is stripped from accounts automatically on startup, while
+  role history keeps the old entries (shown as "retired").
 - You can only change roles of accounts **strictly below** your authority level, and only roles in your assignable list.
 - Destructive actions (edit, disable, delete, reset password) additionally require every one of the target's roles
   to be inside your *manageable* set — e.g. a Chief Curator of State can delete a State Curator but not a Crime Curator.
