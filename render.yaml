@@ -1,0 +1,32 @@
+# Render Blueprint — Libra RP Interview API (free web service).
+# Dashboard → New → Blueprint → select this repository.
+# Secrets marked `sync: false` are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: librarp-interview-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    # --include=dev: TypeScript is a devDependency and Render sets NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      # Proxy mode (Vercel forwards /api/* to Render via API_PROXY_TARGET):
+      # first-party cookie + two proxy hops. For direct mode use none / 1.
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: TRUST_PROXY
+        value: "2"

@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Libra RP — console palette.
+ * Near-black graphite surfaces, off-white type, a single restrained brass
+ * accent (the Libra scales), red/orange reserved for destructive actions and
+ * green only for success.
+ */
+:root {
+  color-scheme: dark;
+
+  --background: #09090b;
+  --foreground: #ececef;
+
+  --card: #0f0f12;
+  --card-foreground: #ececef;
+  --raised: #141418;
+  --popover: #121216;
+  --popover-foreground: #ececef;
+
+  --primary: #c9a45c;
+  --primary-foreground: #0d0c0a;
+  --primary-soft: rgb(201 164 92 / 0.12);
+
+  --secondary: #1a1a1f;
+  --secondary-foreground: #e4e4e8;
+
+  --muted: #16161a;
+  --muted-foreground: #8b8b96;
+  --subtle-foreground: #5f5f6a;
+
+  --accent: #1c1c22;
+  --accent-foreground: #f2f2f4;
+
+  --destructive: #e2583e;
+  --destructive-foreground: #fff5f2;
+  --destructive-soft: rgb(226 88 62 / 0.12);
+
+  --success: #3fb37f;
+  --success-soft: rgb(63 179 127 / 0.12);
+  --warning: #d9a441;
+  --warning-soft: rgb(217 164 65 / 0.12);
+  --info: #7c97d6;
+  --info-soft: rgb(124 151 214 / 0.12);
+
+  --border: #212128;
+  --border-strong: #2d2d36;
+  --input: #26262e;
+  --ring: rgb(201 164 92 / 0.55);
+
+  --radius: 0.5rem;
+  --sidebar-width: 15.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-raised: var(--raised);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  html,
+  body {
+    background: var(--background);
+    color: var(--foreground);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgb(201 164 92 / 0.28);
+    color: #fff;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Thin, quiet scrollbars. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #2d2d36 transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: #2a2a32;
+    border-radius: 8px;
+  }
+  /* Faint engineering grid used on the login screen and empty states. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .bg-noise {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
