@@ -16,7 +16,8 @@ import { PageBody, PageHeader } from "@/components/layout/app-shell";
 import { useOrgLookup } from "@/components/domain/interview-row";
 import { OrgEmblem } from "@/components/domain/org-emblem";
 import { StatusBadge } from "@/components/domain/badges";
-import { CompleteInterviewDialog, ProgressSummary } from "@/components/interviews/complete-dialog";
+import { CompleteInterviewDialog } from "@/components/interviews/complete-dialog";
+import { ScoreSummary } from "@/components/interviews/score";
 import { ResultPicker } from "@/components/interviews/live-parts";
 import { RecordingLinksEditor, RecordingLinksList, normalizeLinks } from "@/components/interviews/recording-links";
 import { Button } from "@/components/ui/button";
@@ -427,7 +428,7 @@ export default function InterviewRecordPage() {
               <CardTitle>Scoring</CardTitle>
             </CardHeader>
             <CardContent>
-              <ProgressSummary progress={i.progress} />
+              <ScoreSummary progress={i.progress} layout="stack" />
               <dl className="mt-4 grid gap-3">
                 <Fact label="Interviewer" value={`${i.interviewer.displayName} (@${i.interviewer.username})`} />
                 <Fact label="Started" value={formatDateTime(i.startedAt)} />

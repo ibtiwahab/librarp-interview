@@ -12,6 +12,7 @@ import { OrgEmblem } from "@/components/domain/org-emblem";
 import { StatusBadge } from "@/components/domain/badges";
 import { CompleteInterviewDialog } from "@/components/interviews/complete-dialog";
 import { RecordingLinksList } from "@/components/interviews/recording-links";
+import { ScoreSummary } from "@/components/interviews/score";
 import { QuestionCard, QuestionNavigator, ResultPicker, SaveIndicator, ShortcutHelp } from "@/components/interviews/live-parts";
 import { ConnectingScreen } from "@/components/layout/connecting-screen";
 import { Button } from "@/components/ui/button";
@@ -294,21 +295,7 @@ function LiveInterview({ interview }: { interview: InterviewDetail }) {
             <RecordingLinksList links={interview.recordingLinks} compact emptyText="None yet — add it when you finish." />
           </div>
           <div className="border-t border-border px-5 py-4">
-            <div className="mb-3 text-[11px] text-subtle-foreground">Running tally</div>
-            <div className="space-y-2">
-              {RESULT_ORDER.filter((r) => r !== "NOT_SCORED").map((r) => (
-                <div key={r} className="flex items-center gap-2 text-xs">
-                  <span className={cn("size-2 rounded-full", RESULT_META[r].dot)} />
-                  <span className="flex-1 text-muted-foreground">{RESULT_META[r].label}</span>
-                  <span className="tabular font-mono">{progress[r]}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-border">
-              {(["CORRECT", "PARTIAL", "INCORRECT", "SKIPPED"] as const).map((r) => (
-                <div key={r} className={RESULT_META[r].dot} style={{ width: `${(progress[r] / total) * 100}%` }} />
-              ))}
-            </div>
+            <ScoreSummary progress={progress} layout="stack" />
             <p className="mt-3 text-[11px] leading-relaxed text-subtle-foreground">Scores are guidance. The final decision is yours.</p>
           </div>
         </aside>

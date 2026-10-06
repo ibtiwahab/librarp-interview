@@ -71,7 +71,7 @@ export const RESULT_META: Record<QuestionResult, { label: string; key: string; t
   PARTIAL: { label: "Partial", key: "2", tone: "text-warning border-warning/40 bg-warning-soft", dot: "bg-warning" },
   INCORRECT: { label: "Incorrect", key: "3", tone: "text-destructive border-destructive/40 bg-destructive-soft", dot: "bg-destructive" },
   SKIPPED: { label: "Skipped", key: "4", tone: "text-muted-foreground border-border-strong bg-muted", dot: "bg-subtle-foreground" },
-  NOT_SCORED: { label: "Not scored", key: "0", tone: "text-muted-foreground border-border bg-transparent", dot: "bg-border-strong" },
+  NOT_SCORED: { label: "Not answered", key: "0", tone: "text-muted-foreground border-border bg-transparent", dot: "bg-border-strong" },
 };
 
 export const RESULT_ORDER: QuestionResult[] = ["CORRECT", "PARTIAL", "INCORRECT", "SKIPPED", "NOT_SCORED"];

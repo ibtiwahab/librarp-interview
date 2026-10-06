@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { RESULT_META, RESULT_ORDER } from "@/lib/constants";
 import { formatRelative } from "@/lib/format";
 import { Kbd, Tooltip } from "@/components/ui/controls";
+import { ChoiceIndicator, choiceClasses, type ChoiceTone } from "@/components/ui/choice";
 import type { SaveStatus, AnswerState } from "@/hooks/use-interview-autosave";
 import type { InterviewQuestion, QuestionResult } from "@/types/api";
 
@@ -53,9 +54,22 @@ export function SaveIndicator({
   );
 }
 
+const RESULT_TONE: Record<QuestionResult, ChoiceTone> = {
+  CORRECT: "success",
+  PARTIAL: "warning",
+  INCORRECT: "danger",
+  SKIPPED: "neutral",
+  NOT_SCORED: "neutral",
+};
+
+/**
+ * One-of-five result selector. The chosen option gets a filled check circle,
+ * solid coloured border and tint; the rest stay grey. (Arrow keys are left to
+ * question navigation — use 1–4 / 0 as shortcuts.)
+ */
 export function ResultPicker({ value, onChange, disabled }: { value: QuestionResult; onChange: (r: QuestionResult) => void; disabled?: boolean }) {
   return (
-    <div role="radiogroup" aria-label="Question result" className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+    <div role="radiogroup" aria-label="Question result" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {RESULT_ORDER.map((r) => {
         const meta = RESULT_META[r];
         const on = value === r;
@@ -67,19 +81,17 @@ export function ResultPicker({ value, onChange, disabled }: { value: QuestionRes
             aria-checked={on}
             disabled={disabled}
             onClick={() => onChange(r)}
-            className={cn(
-              "flex h-10 items-center justify-between gap-2 rounded-md border px-3 text-[13px] font-medium transition-all disabled:opacity-50",
-              on ? meta.tone : "border-border bg-[#0c0c0f] text-muted-foreground hover:border-border-strong hover:text-foreground",
-            )}
+            title={`${meta.label} (key ${meta.key})`}
+            className={cn(choiceClasses(on, RESULT_TONE[r]), "flex h-11 items-center gap-2 px-2.5 text-[13px] font-medium")}
           >
-            <span className="flex items-center gap-2">
-              <span className={cn("size-2 rounded-full", on ? meta.dot : "bg-border-strong")} />
-              {meta.label}
-            </span>
-            <Kbd className="hidden md:inline-flex">{meta.key}</Kbd>
+            <ChoiceIndicator checked={on} tone={RESULT_TONE[r]} />
+            <span className="min-w-0 flex-1 truncate">{meta.label}</span>
           </button>
         );
       })}
+      <p className="col-span-full hidden text-[11px] text-subtle-foreground md:block">
+        Keyboard: {RESULT_ORDER.map((r) => `${RESULT_META[r].key} ${RESULT_META[r].label}`).join(" · ")}
+      </p>
     </div>
   );
 }
@@ -231,7 +243,7 @@ export function ShortcutHelp() {
           <span>
             <Kbd>1</Kbd>–<Kbd>4</Kbd>, <Kbd>0</Kbd>
           </span>
-          <span>Correct · Partial · Incorrect · Skipped · Not scored</span>
+          <span>Correct · Partial · Incorrect · Skipped · Not answered</span>
           <span>
             <Kbd>N</Kbd>
           </span>

@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/format";
 import { PageBody, PageHeader } from "@/components/layout/app-shell";
 import { OrgEmblem } from "@/components/domain/org-emblem";
 import { StatusBadge } from "@/components/domain/badges";
+import { ScorePill } from "@/components/interviews/score";
 import { useOrgLookup } from "@/components/domain/interview-row";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -176,6 +177,7 @@ function HistoryView() {
                     <TH>Organization</TH>
                     <TH className="hidden md:table-cell">Type</TH>
                     <TH>Result</TH>
+                    <TH className="hidden sm:table-cell">Score</TH>
                     <TH className="hidden lg:table-cell">Interviewer</TH>
                     <TH className="text-right">Date</TH>
                   </TR>
@@ -209,6 +211,9 @@ function HistoryView() {
                         <TD className="hidden text-muted-foreground md:table-cell">{INTERVIEW_TYPE_META[i.interviewType].short}</TD>
                         <TD>
                           <StatusBadge status={i.status} />
+                        </TD>
+                        <TD className="hidden sm:table-cell">
+                          <ScorePill progress={i.progress} />
                         </TD>
                         <TD className="hidden text-muted-foreground lg:table-cell">{i.interviewer.displayName}</TD>
                         <TD className="text-right whitespace-nowrap text-muted-foreground">{formatDate(i.interviewDate, "MMM d, yyyy")}</TD>
