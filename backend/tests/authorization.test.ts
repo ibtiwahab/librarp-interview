@@ -213,8 +213,16 @@ describe("interviews, question bank and audit", () => {
   it("question bank management is scoped by category", () => {
     expect(canManageQuestions(chiefState, "STATE")).toBe(true);
     expect(canManageQuestions(chiefState, "CRIME")).toBe(false);
-    expect(canManageQuestions(stateCurator, "STATE")).toBe(false);
     expect(canManageQuestions(headAdmin, "ADMIN")).toBe(true);
+    // Curators manage the question bank of their own category only.
+    expect(canManageQuestions(stateCurator, "STATE")).toBe(true);
+    expect(canManageQuestions(stateCurator, "CRIME")).toBe(false);
+    expect(canManageQuestions(stateCurator, "ADMIN")).toBe(false);
+    expect(canManageQuestions(crimeCurator, "CRIME")).toBe(true);
+    expect(canManageQuestions(crimeCurator, "STATE")).toBe(false);
+    expect(canManageQuestions(supportCurator, "ADMIN")).toBe(true);
+    expect(canManageQuestions(supportCurator, "STATE")).toBe(false);
+    expect(canManageQuestions(serverAdmin, "STATE")).toBe(false);
   });
   it("audit scopes", () => {
     expect(auditScope(executive)).toBe("ALL");

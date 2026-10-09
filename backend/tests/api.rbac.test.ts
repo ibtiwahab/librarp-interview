@@ -374,12 +374,51 @@ describe("interview lifecycle, snapshots and deletion", () => {
 });
 
 describe("question bank permissions", () => {
-  it("State Curator cannot edit questions; Chief State cannot touch Crime questions", async () => {
+  it("Chief State cannot touch Crime questions", async () => {
     const fib = await Question.findOne({ organization: "FIB" });
     const ballas = await Question.findOne({ organization: "BALLAS" });
-    expect((await request(app).patch(`/api/questions/${fib!._id}`).set(auth("stateCur")).send({ required: false })).status).toBe(403);
     expect((await request(app).patch(`/api/questions/${ballas!._id}`).set(auth("chiefState")).send({ required: false })).status).toBe(403);
     expect((await request(app).patch(`/api/questions/${fib!._id}`).set(auth("chiefState")).send({ required: false })).status).toBe(200);
+  });
+
+  it("State Curator can add, edit and delete questions and create sets — for State organizations only", async () => {
+    const fibSet = await QuestionSet.findOne({ organization: "FIB" });
+    const created = await request(app)
+      .post("/api/questions")
+      .set(auth("stateCur"))
+      .send({ questionSet: String(fibSet!._id), questionText: "How will you recruit new agents?" });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id;
+    await request(app).patch(`/api/questions/${id}`).set(auth("stateCur")).send({ questionText: "How will you recruit and train new agents?" }).expect(200);
+    await request(app).delete(`/api/questions/${id}`).set(auth("stateCur")).expect(200);
+
+    const newSet = await request(app)
+      .post("/api/question-sets")
+      .set(auth("stateCur"))
+      .send({ name: "FIB Leadership — Season 2", organization: "FIB" });
+    expect(newSet.status).toBe(201);
+    expect(newSet.body.data.canManage).toBe(true);
+
+    // Outside their category: blocked.
+    const ballas = await Question.findOne({ organization: "BALLAS" });
+    expect((await request(app).patch(`/api/questions/${ballas!._id}`).set(auth("stateCur")).send({ required: false })).status).toBe(403);
+    expect((await request(app).post("/api/question-sets").set(auth("stateCur")).send({ name: "Ballas — Rogue", organization: "BALLAS" })).status).toBe(403);
+    expect((await request(app).post("/api/question-sets").set(auth("stateCur")).send({ name: "Admin — Rogue", organization: "SERVER_ADMIN" })).status).toBe(403);
+  });
+
+  it("Crime and Support Curators manage only their own category", async () => {
+    const ballasSet = await QuestionSet.findOne({ organization: "BALLAS" });
+    const adminSet = await QuestionSet.findOne({ organization: "ADMIN_ASSISTANT" });
+    const fib = await Question.findOne({ organization: "FIB" });
+    expect((await request(app).post("/api/questions").set(auth("crimeCur")).send({ questionSet: String(ballasSet!._id), questionText: "Who runs your corners?" })).status).toBe(201);
+    expect((await request(app).post("/api/questions").set(auth("supportCur")).send({ questionSet: String(adminSet!._id), questionText: "How do you handle a toxic ticket?" })).status).toBe(201);
+    expect((await request(app).post("/api/questions").set(auth("supportCur")).send({ questionSet: String(ballasSet!._id), questionText: "Nope?" })).status).toBe(403);
+    expect((await request(app).delete(`/api/questions/${fib!._id}`).set(auth("crimeCur"))).status).toBe(403);
+  });
+
+  it("an account with no roles cannot manage questions", async () => {
+    const fib = await Question.findOne({ organization: "FIB" });
+    expect((await request(app).patch(`/api/questions/${fib!._id}`).set(auth("plain")).send({ required: false })).status).toBe(403);
   });
 
   it("import preview → bulk import skips duplicates", async () => {
@@ -410,12 +449,17 @@ describe("question bank permissions", () => {
     expect(res.body.error.code).toBe("UNSUPPORTED_FILE_TYPE");
   });
 
-  it("State Curator cannot import documents", async () => {
-    const res = await request(app)
+  it("curators can import documents; accounts with no roles cannot", async () => {
+    const ok = await request(app)
       .post("/api/questions/import/preview")
       .set(auth("stateCur"))
+      .attach("file", Buffer.from("1. What is RDM?\n2. What is VDM?\n"), "q.txt");
+    expect(ok.status).toBe(200);
+    const denied = await request(app)
+      .post("/api/questions/import/preview")
+      .set(auth("plain"))
       .attach("file", Buffer.from("1. Q?"), "q.txt");
-    expect(res.status).toBe(403);
+    expect(denied.status).toBe(403);
   });
 });
 

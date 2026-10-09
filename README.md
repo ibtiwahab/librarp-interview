@@ -278,8 +278,9 @@ Rules enforced server-side:
   and Head Admin see all. Only they can delete interviews.
 - Audit log: Executive Director sees everything; Head Admin sees administrative/question/interview activity
   (not sign-in events).
-- Question bank management: Executive Director & Head Admin (all), Chief Curators (their category). Anyone who can
-  conduct a category can read its questions.
+- Question bank management (add / edit / delete / import questions, create and edit question sets): Executive
+  Director & Head Admin (all categories); Chief Curators and Curators for their own category only — State Curators
+  for State organizations, Crime Curators for Crime, Support Curators for Admin.
 
 ---
 
