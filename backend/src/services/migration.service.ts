@@ -22,4 +22,7 @@ export async function runStartupMigrations(): Promise<void> {
   // 2. The Admin category now has two interview kinds; keep the old default
   // label consistent with "Admin Assistant" / "Server Admin".
   await Organization.updateOne({ code: "SERVER_ADMIN", name: "Server Administration" }, { $set: { name: "Server Admin" } });
+
+  // 3. National Guard's leader title (databases that already created NG with the first default).
+  await Organization.updateOne({ code: "NG", defaultPosition: "NG Commander" }, { $set: { defaultPosition: "General of National Guard" } });
 }

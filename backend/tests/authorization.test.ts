@@ -32,7 +32,7 @@ const supportCurator = user("SUPPORT_CURATOR");
 const serverAdmin = user();
 const multiRole = user("STATE_CURATOR", "SUPPORT_CURATOR");
 
-const STATE_ORGS = ["LSPD", "SAHP", "GOV", "EMS", "FIB"];
+const STATE_ORGS = ["LSPD", "SAHP", "GOV", "EMS", "FIB", "NG"];
 const CRIME_ORGS = ["FAMILIES", "BALLAS", "MARABUNTA", "VAGOS", "BLOODS"];
 
 describe("interview permission matrix", () => {

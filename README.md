@@ -1,7 +1,7 @@
 # Libra RP — Leadership & Administration Interview System
 
 Internal staff platform for the **Libra RP** GTA V roleplay server. Senior staff use it to conduct
-leadership interviews for **State** organizations (LSPD, SAHP, GOV, EMS, FIB), **Crime** organizations
+leadership interviews for **State** organizations (LSPD, SAHP, GOV, EMS, FIB, NG), **Crime** organizations
 (Families, Ballas, Marabunta, Vagos, Bloods) and **Admin** candidates (Admin Assistant and Server Admin), with
 recording links (YouTube, Medal, Google Drive…) attached to each interview; manage a question bank
 (including importing questions from Word/PDF/Excel documents); and administer staff accounts and roles.

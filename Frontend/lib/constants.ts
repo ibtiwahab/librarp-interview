@@ -34,7 +34,7 @@ export const INTERVIEW_TYPE_META: Record<InterviewType, { label: string; short: 
   STATE: {
     label: "State Leadership",
     short: "State",
-    description: "LSPD, SAHP, Government, EMS and FIB leadership candidates.",
+    description: "LSPD, SAHP, Government, EMS, FIB and National Guard leadership candidates.",
     capability: "canInterviewState",
   },
   CRIME: {

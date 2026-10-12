@@ -167,7 +167,7 @@ export const ROLE_DEFINITIONS: Record<Role, RoleDefinition> = {
     role: "STATE_CURATOR",
     label: "State Curator",
     shortLabel: "State Curator",
-    description: "Conducts State leadership interviews (LSPD, SAHP, GOV, EMS, FIB) and manages the State question bank.",
+    description: "Conducts State leadership interviews (LSPD, SAHP, GOV, EMS, FIB, NG) and manages the State question bank.",
     level: 40,
     permissions: ["interviews.conduct.state", "questions.manage.state"],
     assignableRoles: [],

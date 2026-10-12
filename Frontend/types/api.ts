@@ -15,6 +15,7 @@ export type OrganizationCode =
   | "GOV"
   | "EMS"
   | "FIB"
+  | "NG"
   | "FAMILIES"
   | "BALLAS"
   | "MARABUNTA"

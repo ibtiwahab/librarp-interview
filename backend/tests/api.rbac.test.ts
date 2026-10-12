@@ -373,6 +373,22 @@ describe("interview lifecycle, snapshots and deletion", () => {
   });
 });
 
+describe("organizations", () => {
+  it("National Guard is a State organization, available to State staff only", async () => {
+    const asState = await request(app).get("/api/organizations").set(auth("stateCur"));
+    const ng = asState.body.data.organizations.find((o: { code: string }) => o.code === "NG");
+    expect(ng).toMatchObject({
+      name: "National Guard",
+      category: "STATE",
+      defaultPosition: "General of National Guard",
+      canConduct: true,
+      canManageQuestions: true,
+    });
+    const asCrime = await request(app).get("/api/organizations").set(auth("crimeCur"));
+    expect(asCrime.body.data.organizations.find((o: { code: string }) => o.code === "NG").canConduct).toBe(false);
+  });
+});
+
 describe("question bank permissions", () => {
   it("Chief State cannot touch Crime questions", async () => {
     const fib = await Question.findOne({ organization: "FIB" });

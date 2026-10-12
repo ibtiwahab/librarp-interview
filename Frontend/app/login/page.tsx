@@ -91,7 +91,7 @@ function LoginForm() {
 
           <div className="grid max-w-lg grid-cols-3 gap-6 text-xs text-muted-foreground">
             {[
-              ["State", "LSPD · SAHP · GOV · EMS · FIB"],
+              ["State", "LSPD · SAHP · GOV · EMS · FIB · NG"],
               ["Crime", "Families · Ballas · Vagos · Bloods · Marabunta"],
               ["Admin", "Server administration team"],
             ].map(([k, v]) => (
